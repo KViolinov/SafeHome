@@ -25,4 +25,4 @@ storage.child("ioana.jpg").put("images/ioana.jpg")
 # download images from Firebace to PC
 # first argument is the name of the file displayed in firebase
 # second ardumend is the path for the image to be downloaded to the PC
-storage.download("ioana.jpg", "test_ioana.jpg")
+storage.download("ioana.jpg", "images/test_ioana.jpg")
