@@ -1,1 +1,1 @@
-# SafeHome - NOIT 2024 - 2025
+# SafeHome - project for NOIT 2024 - 2025
