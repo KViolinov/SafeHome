@@ -5,7 +5,17 @@ import pyrebase
 import time
 
 # Firebase configuration
-config = { }
+config = {
+    "apiKey": "AIzaSyCO56LE4nFc4Th3WDbt_uSiXbeNiKKlouI",
+    "authDomain": "safehome-c4576.firebaseapp.com",
+    "projectId": "safehome-c4576",
+    "databaseURL": "https://safehome-c4576-default-rtdb.firebaseio.com",
+    "storageBucket": "safehome-c4576.appspot.com",
+    "messagingSenderId": "516133592519",
+    "appId": "1:516133592519:web:0a8b1755b92d70877bcde2",
+    "measurementId": "G-TXJSM010BL",
+    "serviceAccount": "firebase/serviceAccount.json"
+}
 
 # Connecting to Firebase
 try:
@@ -51,7 +61,7 @@ def run_yolo_detection(image_path):  # Function to run the YOLOv8 model
         return None
 
 
-def print_detection_results(results):  # Function to print the result from the YOLOv8 model
+def print_detection_results(results):  # Function to print the result from the YOLOv8 model + openCV
     try:
         boxes = results[0].boxes
         class_names = results[0].names
@@ -68,7 +78,7 @@ def print_detection_results(results):  # Function to print the result from the Y
         return []
 
 
-def upload_detection_results(file_name, results):  # Function to upload/update the results Firebase
+def upload_detection_results(file_name, results):  # Function to upload/update the results in Firebase
     try:
         database.child("detection_results").child(file_name.replace("/", "_")).set(results)
         database.child("images").child(file_name.replace("/", "_")).update({"flag": True})
