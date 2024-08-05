@@ -12,8 +12,8 @@ try:
     firebase = pyrebase.initialize_app(config)
     storage = firebase.storage()
     database = firebase.database()
-except Exception as e:
-    print(f"Error initializing Firebase: {e}")
+except Exception as exception:
+    print(f"Error initializing Firebase: {exception}")
     exit()
 
 
@@ -26,8 +26,8 @@ def get_last_unprocessed_image():  # Function to check the last unprocessed imag
                 metadata = database.child("images").child(file.name.replace("/", "_")).get().val()
                 if metadata and not metadata.get('flag', False):
                     return file.name
-    except Exception as e:
-        print(f"Error retrieving unprocessed image: {e}")
+    except Exception as exception:
+        print(f"Error retrieving unprocessed image: {exception}")
     return None
 
 
@@ -35,8 +35,8 @@ def download_image(file_name, local_path):  # Function to download the picture f
     try:
         storage.child(file_name).download(local_path)
         return local_path
-    except Exception as e:
-        print(f"Error downloading image: {e}")
+    except Exception as exception:
+        print(f"Error downloading image: {exception}")
         return None
 
 
