@@ -14,7 +14,7 @@ firebase_admin.initialize_app(cred, {
 bucket = storage.bucket()
 
 
-def get_next_image():
+def get_next_image(): # Function to load the next unchecked image from Firebase Storage
     blobs = bucket.list_blobs()
     for blob in blobs:
         if blob.name.endswith(".jpg"):
@@ -22,13 +22,13 @@ def get_next_image():
     return None
 
 
-def download_image(blob_name, local_path):
+def download_image(blob_name, local_path): # Function to download the picture from Firebase Storage to PC
     blob = bucket.blob(blob_name)
     blob.download_to_filename(local_path)
     return local_path
 
 
-def run_yolo_detection(image_path):
+def run_yolo_detection(image_path): # Function to run the YOLOv8n model + openCV
     try:
         model = YOLO('yolov8n.pt')
         frame = cv2.imread(image_path)
@@ -39,7 +39,7 @@ def run_yolo_detection(image_path):
         return None
 
 
-def print_detection_results(file_name, results):
+def print_detection_results(file_name, results): # Function to print the result to the terminal
     try:
         boxes = results[0].boxes
         class_names = results[0].names
@@ -63,7 +63,7 @@ def print_detection_results(file_name, results):
 
 
 
-def delete_image(blob_name):
+def delete_image(blob_name): # Function to delete the picture/image from the PC
     blob = bucket.blob(blob_name)
     blob.delete()
 
