@@ -1,105 +1,58 @@
-#include <Arduino.h>
-#include <FreeRTOS.h>
-#include <ESP32Servo.h>
+#define RED_PIN    25
+#define GREEN_PIN  26
+#define BLUE_PIN   27
+#define RELAY_PIN  14
 
-// Define the RGB LED pins
-#define RED_PIN 5
-#define GREEN_PIN 18
-#define BLUE_PIN 19
-
-// Define the Servo pin
-#define SERVO_PIN 26
-
-// Create a Servo object
-Servo myServo;
-
-// Task handles
-TaskHandle_t TaskHandleRGB;
-TaskHandle_t TaskHandleServo;
-
-void setup() {
-  Serial.begin(115200);
-  
-  // Initialize the RGB LED pins as outputs
+// Task to control the RGB LED
+void TaskRGB(void *pvParameters) {
+  (void) pvParameters;
   pinMode(RED_PIN, OUTPUT);
   pinMode(GREEN_PIN, OUTPUT);
   pinMode(BLUE_PIN, OUTPUT);
 
-  // Attach the servo to the specified pin
-  myServo.attach(SERVO_PIN);
-  
-  // Create tasks
-  xTaskCreate(taskControlRGB, "ControlRGB", 1024, NULL, 1, &TaskHandleRGB);
-  xTaskCreate(taskControlServo, "ControlServo", 1024, NULL, 1, &TaskHandleServo);
+  while (1) {
+    // Set RGB to red
+    analogWrite(RED_PIN, 255);
+    analogWrite(GREEN_PIN, 0);
+    analogWrite(BLUE_PIN, 0);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    // Set RGB to green
+    analogWrite(RED_PIN, 0);
+    analogWrite(GREEN_PIN, 255);
+    analogWrite(BLUE_PIN, 0);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    // Set RGB to blue
+    analogWrite(RED_PIN, 0);
+    analogWrite(GREEN_PIN, 0);
+    analogWrite(BLUE_PIN, 255);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+  }
+}
+
+// Task to control the relay
+void TaskRelay(void *pvParameters) {
+  (void) pvParameters;
+  pinMode(RELAY_PIN, OUTPUT);
+
+  while (1) {
+    // Turn relay on
+    digitalWrite(RELAY_PIN, HIGH);
+    vTaskDelay(3500 / portTICK_PERIOD_MS);
+
+    // Turn relay off
+    digitalWrite(RELAY_PIN, LOW);
+    vTaskDelay(2300 / portTICK_PERIOD_MS);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  xTaskCreate(TaskRGB, "Task RGB", 1000, NULL, 1, NULL);
+  xTaskCreate(TaskRelay, "Task Relay", 1000, NULL, 1, NULL);
 }
 
 void loop() {
-  // Nothing to do here, everything is handled by tasks
-}
-
-// Task to control the RGB LED
-void taskControlRGB(void *pvParameters) {
-  while (1) {
-    // Red
-    digitalWrite(RED_PIN, HIGH);
-    digitalWrite(GREEN_PIN, LOW);
-    digitalWrite(BLUE_PIN, LOW);
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    
-    // Green
-    digitalWrite(RED_PIN, LOW);
-    digitalWrite(GREEN_PIN, HIGH);
-    digitalWrite(BLUE_PIN, LOW);
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    
-    // Blue
-    digitalWrite(RED_PIN, LOW);
-    digitalWrite(GREEN_PIN, LOW);
-    digitalWrite(BLUE_PIN, HIGH);
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    
-    // Yellow
-    digitalWrite(RED_PIN, HIGH);
-    digitalWrite(GREEN_PIN, HIGH);
-    digitalWrite(BLUE_PIN, LOW);
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    
-    // Cyan
-    digitalWrite(RED_PIN, LOW);
-    digitalWrite(GREEN_PIN, HIGH);
-    digitalWrite(BLUE_PIN, HIGH);
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    
-    // Magenta
-    digitalWrite(RED_PIN, HIGH);
-    digitalWrite(GREEN_PIN, LOW);
-    digitalWrite(BLUE_PIN, HIGH);
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    
-    // White
-    digitalWrite(RED_PIN, HIGH);
-    digitalWrite(GREEN_PIN, HIGH);
-    digitalWrite(BLUE_PIN, HIGH);
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    
-    // Off
-    digitalWrite(RED_PIN, LOW);
-    digitalWrite(GREEN_PIN, LOW);
-    digitalWrite(BLUE_PIN, LOW);
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-  }
-}
-
-// Task to control the servo motor
-void taskControlServo(void *pvParameters) {
-  while (1) {
-    for (int pos = 0; pos <= 180; pos += 1) {
-      myServo.write(pos);
-      vTaskDelay(15 / portTICK_PERIOD_MS);
-    }
-    for (int pos = 180; pos >= 0; pos -= 1) {
-      myServo.write(pos);
-      vTaskDelay(15 / portTICK_PERIOD_MS);
-    }
-  }
+  // Empty. Tasks are running independently.
 }
