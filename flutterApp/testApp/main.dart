@@ -3,6 +3,8 @@ import 'package:camera/camera.dart';
 import 'screens/home_screen.dart';
 import 'screens/add_camera_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/login_screen.dart';
+import 'screens/signup_screen.dart';
 
 List<CameraDescription> cameras = [];
 
@@ -21,6 +23,20 @@ class CameraApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       home: MainScreen(),
+      routes: {
+        '/login': (context) => LoginScreen(),
+        '/signup': (context) => SignupScreen(),
+        '/profile': (context) => ProfileScreen(),
+      },
+      // Optional: to handle undefined routes
+      onUnknownRoute: (settings) {
+        return MaterialPageRoute(
+          builder: (context) => Scaffold(
+            appBar: AppBar(title: Text('404')),
+            body: Center(child: Text('Page not found')),
+          ),
+        );
+      },
     );
   }
 }
