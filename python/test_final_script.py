@@ -2,33 +2,32 @@ from ultralytics import YOLO
 import cv2
 import os
 import firebase_admin
-from firebase_admin import credentials, storage
+from firebase_admin import credentials, storage, db
 import time
+import re
 
 # Firebase configuration
 cred = credentials.Certificate("model_data/firebase/safehome-c4576-firebase-adminsdk-2rli7-6d7d62f21f.json")  # Ensure the correct path
 firebase_admin.initialize_app(cred, {
-    'storageBucket': 'safehome-c4576.appspot.com'
+    'storageBucket': 'safehome-c4576.appspot.com',
+    'databaseURL': 'https://safehome-c4576-default-rtdb.firebaseio.com'  # Add your database URL here
 })
 
 bucket = storage.bucket()
 
-
-def get_next_image(): # Function to load the next unchecked image from Firebase Storage
+def get_next_image():
     blobs = bucket.list_blobs()
     for blob in blobs:
         if blob.name.endswith(".jpg"):
             return blob.name
     return None
 
-
-def download_image(blob_name, local_path): # Function to download the picture from Firebase Storage to PC
+def download_image(blob_name, local_path):
     blob = bucket.blob(blob_name)
     blob.download_to_filename(local_path)
     return local_path
 
-
-def run_yolo_detection(image_path): # Function to run the YOLOv8n model + openCV
+def run_yolo_detection(image_path):
     try:
         model = YOLO('yolov8n.pt')
         frame = cv2.imread(image_path)
@@ -38,34 +37,56 @@ def run_yolo_detection(image_path): # Function to run the YOLOv8n model + openCV
         print(f"Error running YOLO detection: {e}")
         return None
 
-
-def print_detection_results(file_name, results): # Function to print the result to the terminal
+def print_detection_results(file_name, results):
     try:
         boxes = results[0].boxes
         class_names = results[0].names
 
         detection_results = []
+        max_confidence = 0
+        detected_object = None
+
         for box in boxes:
             class_id = int(box.cls[0])
             class_name = class_names[class_id]
             confidence = box.conf[0]
             detection_results.append({"class_name": class_name, "confidence": confidence})
 
+            # Update the max confidence and corresponding detected object
+            if confidence > max_confidence:
+                max_confidence = confidence
+                detected_object = class_name
+
         # Print results to the terminal
         print(f"Results for file: {file_name}")
         for result in detection_results:
             print(f"Detected {result['class_name']} with confidence {result['confidence']}")
 
-        return detection_results
+        # Print the detected object with the highest confidence
+        if detected_object:
+            print(f"Detected object with highest confidence: {detected_object} ({max_confidence})")
+
+        return detected_object
     except Exception as e:
         print(f"Error printing detection results: {e}")
-        return []
+        return None
 
-
-
-def delete_image(blob_name): # Function to delete the picture/image from the PC
+def delete_image(blob_name):
     blob = bucket.blob(blob_name)
     blob.delete()
+
+
+def send_to_firebase(file_name, detected_object):
+    try:
+        # Replace invalid characters in the file name with underscores
+        sanitized_file_name = re.sub(r'[.$#[\]/]', '_', file_name)
+
+        ref = db.reference('/results/')
+        # Use the sanitized file_name as the key and detected_object as the value
+        ref.child(sanitized_file_name).set(detected_object)
+        print(f"Sent to Firebase: {sanitized_file_name} - {detected_object}")
+    except Exception as e:
+        print(f"Error sending data to Firebase: {e}")
 
 
 def main():
@@ -83,7 +104,9 @@ def main():
             if local_image_path:
                 results = run_yolo_detection(local_image_path)
                 if results:
-                    print_detection_results(image_file_name, results)  # Pass file name here
+                    detected_object = print_detection_results(image_file_name, results)
+                    if detected_object:
+                        send_to_firebase(image_file_name, detected_object)
                     os.remove(local_image_path)
                     delete_image(image_file_name)
                     print("Processed and cleaned up the image.")
