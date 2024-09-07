@@ -1,57 +1,53 @@
-// Currently working version for sending pictures to Firebase storage
-
-#include "Arduino.h"
-#include "WiFi.h"
-#include "esp_camera.h"
-#include "soc/soc.h"
-#include "soc/rtc_cntl_reg.h"
-#include "Firebase_ESP_Client.h"
+#include <Arduino.h>
+#include <WiFi.h>
+#include <FirebaseESP32.h>
+#include <esp_camera.h>
 #include <addons/TokenHelper.h>
-#include <FS.h>
-#include <LittleFS.h>
+#include <addons/RTDBHelper.h>
 
-// Camera Pin Definition
-#define PWDN_GPIO_NUM    -1
-#define RESET_GPIO_NUM   -1
-#define XCLK_GPIO_NUM    21
-#define SIOD_GPIO_NUM    26
-#define SIOC_GPIO_NUM    27
-#define Y9_GPIO_NUM      35
-#define Y8_GPIO_NUM      34
-#define Y7_GPIO_NUM      39
-#define Y6_GPIO_NUM      36
-#define Y5_GPIO_NUM      19
-#define Y4_GPIO_NUM      18
-#define Y3_GPIO_NUM      5
-#define Y2_GPIO_NUM      4
-#define VSYNC_GPIO_NUM   25
-#define HREF_GPIO_NUM    23
-#define PCLK_GPIO_NUM    22
-
-// Replace with your network credentials
-const char* ssid = "B-Smart";
+// WiFi credentials
+const char* ssid = "Konstantin's P60 Pro";
 const char* password = "0889909595";
 
-// Firebase configuration
+// Firebase project settings
 #define API_KEY "AIzaSyCO56LE4nFc4Th3WDbt_uSiXbeNiKKlouI"
-#define USER_EMAIL "kviolinov@gmail.com"
-#define USER_PASSWORD "Kv0889909595"
-#define STORAGE_BUCKET_ID "safehome-c4576.appspot.com"
+#define DATABASE_URL "https://safehome-c4576-default-rtdb.firebaseio.com"
 
+// Define Firebase Data object
 FirebaseData fbdo;
 FirebaseAuth auth;
-FirebaseConfig configF;
+FirebaseConfig firebaseConfig;
 
-void initWiFi() {
+// Camera pin configuration for ESP32-VROOM-DEV
+#define PWDN_GPIO_NUM     32
+#define RESET_GPIO_NUM    -1
+#define XCLK_GPIO_NUM     21
+#define SIOD_GPIO_NUM     26
+#define SIOC_GPIO_NUM     27
+#define Y9_GPIO_NUM       35
+#define Y8_GPIO_NUM       34
+#define Y7_GPIO_NUM       39
+#define Y6_GPIO_NUM       36
+#define Y5_GPIO_NUM       19
+#define Y4_GPIO_NUM       18
+#define Y3_GPIO_NUM       5
+#define Y2_GPIO_NUM       4
+#define VSYNC_GPIO_NUM    25
+#define HREF_GPIO_NUM     23
+#define PCLK_GPIO_NUM     22
+
+void setup() {
+  Serial.begin(115200);
+
+  // Connect to Wi-Fi
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     Serial.println("Connecting to WiFi...");
   }
   Serial.println("Connected to WiFi");
-}
 
-void initCamera() {
+  // Initialize camera
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -73,79 +69,45 @@ void initCamera() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-
-  config.frame_size = FRAMESIZE_QVGA; // 320x240
-  config.jpeg_quality = 12;
-  config.fb_count = 1;
+  config.frame_size = FRAMESIZE_VGA;
+  config.jpeg_quality = 10;
+  config.fb_count = 2;
 
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
-    Serial.printf("Camera init failed with error 0x%x\n", err);
+    Serial.printf("Camera init failed with error 0x%x", err);
     return;
   }
-  Serial.println("Camera initialized");
-}
 
-void initFileSystem() {
-  if (!LittleFS.begin()) {
-    Serial.println("Failed to initialize LittleFS");
-    return;
-  }
-  Serial.println("LittleFS initialized");
-}
-
-void saveToFileSystem(camera_fb_t * fb) {
-  File file = LittleFS.open("/photo.jpg", "w");
-  if (!file) {
-    Serial.println("Failed to open file for writing");
-    return;
-  }
-  file.write(fb->buf, fb->len);
-  file.close();
-  Serial.println("File saved to LittleFS");
-}
-
-void uploadFile() {
-  if (Firebase.ready()) {
-    Serial.print("Uploading picture... ");
-    if (Firebase.Storage.upload(&fbdo, STORAGE_BUCKET_ID, "/photo.jpg", mem_storage_type_flash, "/photo.jpg", "image/jpeg")) {
-      Serial.printf("\nDownload URL: %s\n", fbdo.downloadURL().c_str());
-    } else {
-      Serial.println(fbdo.errorReason());
-    }
-  }
-}
-
-void setup() {
-  Serial.begin(115200);
-  initWiFi();
-
-  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
-
-  initCamera();
-  initFileSystem();
-
-  configF.api_key = API_KEY;
-  auth.user.email = USER_EMAIL;
-  auth.user.password = USER_PASSWORD;
-  configF.token_status_callback = tokenStatusCallback; // See TokenHelper.h
-
-  Firebase.begin(&configF, &auth);
+  // Initialize Firebase
+  firebaseConfig.api_key = API_KEY;
+  firebaseConfig.database_url = DATABASE_URL;
+  Firebase.begin(&firebaseConfig, &auth);
   Firebase.reconnectWiFi(true);
 }
 
 void loop() {
+  // Capture a photo
   camera_fb_t * fb = esp_camera_fb_get();
   if (!fb) {
     Serial.println("Camera capture failed");
     return;
   }
 
-  Serial.printf("Captured image size: %d bytes\n", fb->len);
+  // Generate a unique filename
+  String filename = "/photo_" + String(millis()) + ".jpg";
 
-  saveToFileSystem(fb);
-  uploadFile();
+  // Upload photo to Firebase Realtime Database
+  if (Firebase.setBlob(fbdo, "photos" + filename, fb->buf, fb->len)) {
+    Serial.println("Photo uploaded successfully");
+  } else {
+    Serial.println("Photo upload failed");
+    Serial.println(fbdo.errorReason());
+  }
 
+  // Free the memory used by the framebuffer
   esp_camera_fb_return(fb);
-  delay(10000); // Delay to avoid continuous uploading
+
+  // Wait for 10 seconds before taking the next photo
+  delay(10000);
 }
