@@ -1,40 +1,32 @@
-#include <Arduino.h>
+#include "esp_camera.h"
 #include <WiFi.h>
-#include <FirebaseESP32.h>
-#include <esp_camera.h>
-#include <addons/TokenHelper.h>
-#include <addons/RTDBHelper.h>
+#include <HTTPClient.h>
+
+// Pin definitions for AI-Thinker model
+#define PWDN_GPIO_NUM    -1
+#define RESET_GPIO_NUM   -1
+#define XCLK_GPIO_NUM    21
+#define SIOD_GPIO_NUM    26
+#define SIOC_GPIO_NUM    27
+#define Y9_GPIO_NUM      35
+#define Y8_GPIO_NUM      34
+#define Y7_GPIO_NUM      39
+#define Y6_GPIO_NUM      36
+#define Y5_GPIO_NUM      19
+#define Y4_GPIO_NUM      18
+#define Y3_GPIO_NUM      5
+#define Y2_GPIO_NUM      4
+#define VSYNC_GPIO_NUM   25
+#define HREF_GPIO_NUM    23
+#define PCLK_GPIO_NUM    22
 
 // WiFi credentials
-const char* ssid = "Konstantin's P60 Pro";
-const char* password = "0889909595";
+const char* ssid = "*********"; // Replace with your WiFi SSID
+const char* password = "********"; // Replace with your WiFi Password
 
-// Firebase project settings
-#define API_KEY "AIzaSyCO56LE4nFc4Th3WDbt_uSiXbeNiKKlouI"
-#define DATABASE_URL "https://safehome-c4576-default-rtdb.firebaseio.com"
-
-// Define Firebase Data object
-FirebaseData fbdo;
-FirebaseAuth auth;
-FirebaseConfig firebaseConfig;
-
-// Camera pin configuration for ESP32-VROOM-DEV
-#define PWDN_GPIO_NUM     32
-#define RESET_GPIO_NUM    -1
-#define XCLK_GPIO_NUM     21
-#define SIOD_GPIO_NUM     26
-#define SIOC_GPIO_NUM     27
-#define Y9_GPIO_NUM       35
-#define Y8_GPIO_NUM       34
-#define Y7_GPIO_NUM       39
-#define Y6_GPIO_NUM       36
-#define Y5_GPIO_NUM       19
-#define Y4_GPIO_NUM       18
-#define Y3_GPIO_NUM       5
-#define Y2_GPIO_NUM       4
-#define VSYNC_GPIO_NUM    25
-#define HREF_GPIO_NUM     23
-#define PCLK_GPIO_NUM     22
+// Firebase API variables
+const char* firebaseAuth = "*****";
+const char* storageBucket = "********"; // Firebase Storage bucket
 
 void setup() {
   Serial.begin(115200);
@@ -47,7 +39,7 @@ void setup() {
   }
   Serial.println("Connected to WiFi");
 
-  // Initialize camera
+  // Initialize the camera
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -68,22 +60,18 @@ void setup() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
-  config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_VGA;
-  config.jpeg_quality = 10;
-  config.fb_count = 2;
+  config.pixel_format = PIXFORMAT_JPEG; // JPEG format to minimize memory usage
 
-  esp_err_t err = esp_camera_init(&config);
-  if (err != ESP_OK) {
-    Serial.printf("Camera init failed with error 0x%x", err);
+  // Frame size and image quality settings
+  config.frame_size = FRAMESIZE_VGA;
+  config.jpeg_quality = 10; // Higher quality if needed
+  config.fb_count = 1;
+
+  // Initialize the camera
+  if (esp_camera_init(&config) != ESP_OK) {
+    Serial.println("Camera init failed");
     return;
   }
-
-  // Initialize Firebase
-  firebaseConfig.api_key = API_KEY;
-  firebaseConfig.database_url = DATABASE_URL;
-  Firebase.begin(&firebaseConfig, &auth);
-  Firebase.reconnectWiFi(true);
 }
 
 void loop() {
@@ -94,20 +82,35 @@ void loop() {
     return;
   }
 
-  // Generate a unique filename
-  String filename = "/photo_" + String(millis()) + ".jpg";
+  // Upload image to Firebase
+  sendImageToFirebase(fb->buf, fb->len);
 
-  // Upload photo to Firebase Realtime Database
-  if (Firebase.setBlob(fbdo, "photos" + filename, fb->buf, fb->len)) {
-    Serial.println("Photo uploaded successfully");
-  } else {
-    Serial.println("Photo upload failed");
-    Serial.println(fbdo.errorReason());
-  }
-
-  // Free the memory used by the framebuffer
+  // Return the frame buffer to be reused
   esp_camera_fb_return(fb);
 
-  // Wait for 10 seconds before taking the next photo
-  delay(10000);
+  delay(10000); // Capture every 10 seconds (for demo purposes)
+}
+
+void sendImageToFirebase(uint8_t * imageData, size_t len) {
+  HTTPClient http;
+
+  String filename = "image_" + String(millis()) + ".jpg"; // Create a unique filename
+  String url = "https://firebasestorage.googleapis.com/v0/b/" + String(storageBucket) + "/o/" + filename + "?uploadType=media";
+
+  // Initialize HTTP request
+  http.begin(url.c_str());
+  http.addHeader("Authorization", "Bearer " + String(firebaseAuth));  // Use Bearer token for authentication
+  http.addHeader("Content-Type", "image/jpeg");
+
+  // Send the POST request with the image data
+  int httpResponseCode = http.POST(imageData, len);
+  
+  if (httpResponseCode > 0) {
+    String response = http.getString();
+    Serial.println("Image uploaded, response: " + response);
+  } else {
+    Serial.println("Error uploading image, HTTP response: " + String(httpResponseCode));
+  }
+
+  http.end();
 }
