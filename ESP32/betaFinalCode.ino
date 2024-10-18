@@ -23,12 +23,12 @@
 #define PCLK_GPIO_NUM    22
 
 // WiFi credentials
-const char* ssid = "***"; // Replace with your WiFi SSID
-const char* password = "******"; // Replace with your WiFi Password
+const char* ssid = "B-Smart"; // Replace with your WiFi SSID
+const char* password = "0889909595"; // Replace with your WiFi Password
 
 // Firebase API variables
-const char* firebaseAuth = "***********...";
-const char* storageBucket = "*****"; // Firebase Storage bucket
+const char* firebaseAuth = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjhkOWJlZmQzZWZmY2JiYzgyYzgzYWQwYzk3MmM4ZWE5NzhmNmYxMzciLCJ0eXAiOiJKV1QifQ...";
+const char* storageBucket = "safehome-c4576.appspot.com"; // Firebase Storage bucket
 
 void setup() {
   Serial.begin(115200);
