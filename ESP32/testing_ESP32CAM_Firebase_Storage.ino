@@ -1,6 +1,10 @@
+//24.10.24
+
 #include "esp_camera.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
+
+#define MOTION_SENSOR_PIN 13 
 
 // Pin definitions for AI-Thinker model
 #define PWDN_GPIO_NUM    -1
@@ -21,16 +25,17 @@
 #define PCLK_GPIO_NUM    22
 
 // WiFi credentials
-const char* ssid = "*********"; // Replace with your WiFi SSID
-const char* password = "********"; // Replace with your WiFi Password
+const char* ssid = "B-Smart"; // Replace with your WiFi SSID
+const char* password = "0889909595"; // Replace with your WiFi Password
 
 // Firebase API variables
-const char* firebaseAuth = "*****";
-const char* storageBucket = "********"; // Firebase Storage bucket
+const char* firebaseAuth = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjhkOWJlZmQzZWZmY2JiYzgyYzgzYWQwYzk3MmM4ZWE5NzhmNmYxMzciLCJ0eXAiOiJKV1QifQ...";
+const char* storageBucket = "safehome-c4576.appspot.com"; // Firebase Storage bucket
 
 void setup() {
   Serial.begin(115200);
 
+  pinMode(MOTION_SENSOR_PIN, INPUT);
   // Connect to Wi-Fi
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
@@ -76,19 +81,26 @@ void setup() {
 
 void loop() {
   // Capture a photo
-  camera_fb_t * fb = esp_camera_fb_get();
-  if (!fb) {
-    Serial.println("Camera capture failed");
-    return;
+  if (digitalRead(MOTION_SENSOR_PIN) == HIGH) {
+    Serial.println("Motion detected!");
+
+    // Capture a photo
+    camera_fb_t * fb = esp_camera_fb_get();
+    if (!fb) {
+      Serial.println("Camera capture failed");
+      return;
+    }
+    
+
+    // Upload image to Firebase
+    sendImageToFirebase(fb->buf, fb->len);
+
+    // Return the frame buffer to be reused
+    esp_camera_fb_return(fb);
+
+    // Debounce: avoid taking too many pictures in a short time
+    delay(10000);  // Wait for 10 seconds before checking for motion again
   }
-
-  // Upload image to Firebase
-  sendImageToFirebase(fb->buf, fb->len);
-
-  // Return the frame buffer to be reused
-  esp_camera_fb_return(fb);
-
-  delay(10000); // Capture every 10 seconds (for demo purposes)
 }
 
 void sendImageToFirebase(uint8_t * imageData, size_t len) {
