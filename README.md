@@ -1,1 +1,1 @@
-# SafeHome - NOIT 2024 - 2025
+# SafeHome - NOIT / Djon Atanasov 2024 - 2025
