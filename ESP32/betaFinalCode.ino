@@ -1,3 +1,5 @@
+/* not tested final code with FreeRTOS-AP-UDP-Live video stream */
+
 #include "esp_camera.h"
 #include <WiFi.h>
 #include <WebServer.h>
