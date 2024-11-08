@@ -9,14 +9,13 @@ import requests
 
 # List to store discovered devices
 discovered_devices = []
-# Dictionary to store MAC address and Localtunnel link
+# Dictionary to store MAC address and ngrok link
 device_links = {}
 # Last sent device links to prevent resending the same data
 last_sent_device_links = {}
 
 # Function to check if a device is already in the list
 def is_device_already_discovered(ip, mac):
-    global discovered_devices
     for device in discovered_devices:
         if device['ip'] == ip and device['mac'] == mac:
             return True
@@ -49,47 +48,43 @@ def listen_for_esp32_packages(port=5005):
                 server_socket.sendto(response_message, (ip, port))
                 print(f"Sent DISCOVERED message to {ip}:{port}, MAC: {mac_address}")
 
-                # Start Localtunnel for the discovered ESP32
-                localtunnel_url = start_localtunnel(ip)
-                if localtunnel_url:
-                    device_links[mac_address] = localtunnel_url  # Add to dictionary
-                    print(f"Device Links Dictionary: {device_links}")  # Print the dictionary to the terminal
+                # Start ngrok for the discovered ESP32
+                ngrok_url = start_ngrok(ip)
+                if ngrok_url:
+                    # Check if MAC address is already in the dictionary and update the link if it exists
+                    device_links[mac_address] = ngrok_url  # Update with the new link
+                    print(f"Updated Device Links Dictionary: {device_links}")
 
-                    # Send device links to the Firebase API
-                    send_device_links_to_firebase()  # Updated function call
+                    # Send device links to Firebase API
+                    send_device_links_to_firebase()
 
-# Function to start Localtunnel and get the public URL
-def start_localtunnel(esp32_ip, esp32_port=80):
-    localtunnel_command = f"lt --port {esp32_port} --subdomain {esp32_ip.replace('.', '-')}"  # Replace dots in IP for subdomain
+# Function to start ngrok and get the public URL
+def start_ngrok(esp32_ip, esp32_port=80):
+    ngrok_command = f"ngrok http {esp32_ip}:{esp32_port}"
 
-    # Start Localtunnel as a subprocess
-    localtunnel_process = subprocess.Popen(localtunnel_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # Start ngrok as a subprocess
+    ngrok_process = subprocess.Popen(ngrok_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    # Wait a moment for Localtunnel to initialize
+    # Wait a moment for ngrok to initialize
     time.sleep(5)
 
-    # Function to get the public URL from Localtunnel's API
-    def get_localtunnel_url():
+    # Function to get the public URL from ngrok's API
+    def get_ngrok_url():
         try:
-            # The output of Localtunnel includes the public URL; read from the process
-            while True:
-                output = localtunnel_process.stdout.readline()
-                if output == b"" and localtunnel_process.poll() is not None:
-                    break
-                if output:
-                    # Decode the output and print it for debugging
-                    output_str = output.decode('utf-8').strip()
-                    print(f"Localtunnel Output: {output_str}")  # Debugging output
-                    if "your" in output_str and "localtunnel" in output_str:
-                        return output_str.split(' ')[-1].strip() + "/video"
+            # The output of ngrok includes the public URL; read from the process
+            ngrok_api_command = "curl -s http://localhost:4040/api/tunnels"
+            output = subprocess.check_output(ngrok_api_command, shell=True).decode('utf-8')
+            tunnels_info = json.loads(output)
+            if tunnels_info['tunnels']:
+                return tunnels_info['tunnels'][0]['public_url'] + "/video"
         except Exception as e:
-            print(f"Error retrieving Localtunnel URL: {e}")
+            print(f"Error retrieving ngrok URL: {e}")
         return None
 
     # Try to get the public URL
-    return get_localtunnel_url()
+    return get_ngrok_url()
 
-# Function to send device links to the PHP API
+# Function to send device links to Firebase
 def send_device_links_to_firebase():
     global device_links
 
@@ -97,17 +92,25 @@ def send_device_links_to_firebase():
     firebase_url = "https://safehome-c4576-default-rtdb.firebaseio.com/device_links.json"
 
     try:
-        print("Sending device links to Firebase...")
+        print("Checking existing device links in Firebase...")
 
-        # Sending a PATCH request to add the device_links dictionary to /device_links folder in Firebase
-        response = requests.patch(firebase_url, json=device_links)
+        # Fetch existing links from Firebase
+        response = requests.get(firebase_url)
+        existing_data = response.json() if response.status_code == 200 else {}
 
-        print("Response from Firebase:", response.status_code, response.text)  # Debugging response
+        if not existing_data:
+            print("No existing data found. Adding new links to Firebase.")
 
-        if response.status_code == 200:
-            print("Device links successfully sent to Firebase.")
-        else:
-            print(f"Failed to send device links: {response.status_code}")
+        # Update existing entries or add new ones
+        for mac, url in device_links.items():
+            if mac in existing_data:
+                print(f"Updating link for MAC: {mac} in Firebase.")
+            else:
+                print(f"Adding new link for MAC: {mac} in Firebase.")
+            # Update Firebase with the new or updated link
+            requests.patch(firebase_url, json={mac: url})
+
+        print("Device links successfully sent to Firebase.")
 
     except Exception as e:
         print(f"Error sending to Firebase: {e}")
