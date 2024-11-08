@@ -1,33 +1,32 @@
-# Security Policy
+# Политика за сигурност
 
-## Supported Versions
+## Поддържани версии
 
-We actively provide security updates for the following versions of the project:
+Ние активно предоставяме актуализации за сигурността за следните версии на проекта:
 
-| Version | Supported          |
-| ------- | ------------------ |
+| Версия  | Поддържана        |
+| ------- | ----------------- |
 | 1.0.0   | :white_check_mark: |
 
+Препоръчваме да актуализирате до най-новата поддържана версия, за да осигурите на проекта си най-новите пачове за сигурност.
 
-We recommend upgrading to the latest supported version to ensure your project benefits from the latest security patches.
+## Докладване на уязвимост
 
-## Reporting a Vulnerability
+Ако откриете уязвимост в сигурността на нашия проект, следвайте тези стъпки:
 
-If you discover a security vulnerability in our project, please follow these steps:
-
-1. **Submit a Vulnerability Report**: Send your report to our designated security email at [safehome_help@outlook.com](mailto:safehome_help@outlook.com).
+1. **Подаване на доклад за уязвимост**: Изпратете доклада си на нашия специализиран имейл за сигурност на [safehome_help@outlook.com](mailto:safehome_help@outlook.com).
    
-2. **What to Include in the Report**:
-   - A clear description of the vulnerability.
-   - Steps to reproduce (if applicable).
-   - Any relevant context or impact analysis.
+2. **Какво да включите в доклада**:
+   - Ясно описание на уязвимостта.
+   - Стъпки за възпроизвеждане (ако е приложимо).
+   - Всеки релевантен контекст или анализ на въздействието.
 
-3. **Acknowledgment & Timeline**:
-   - You will receive an acknowledgment of your report within **48 hours**.
-   - Updates on the status of your reported issue will be provided within **2 weeks**, depending on the complexity and severity of the vulnerability.
+3. **Потвърждение и времева линия**:
+   - Ще получите потвърждение за вашия доклад в рамките на **48 часа**.
+   - Актуализации за статуса на докладвания проблем ще бъдат предоставяни в рамките на **2 седмици**, в зависимост от сложността и сериозността на уязвимостта.
 
-4. **Resolution and Disclosure**:
-   - If the vulnerability is accepted, we will work to release a patch and notify all users with instructions on updating.
-   - If the issue is not accepted, we will inform you of the decision with an explanation.
+4. **Решение и разкритие**:
+   - Ако уязвимостта бъде приета, ние ще работим по издаването на пач и ще уведомим всички потребители с инструкции за актуализиране.
+   - Ако проблемът не бъде приет, ще ви информираме за решението с обяснение.
 
-Your contributions to securing the project are invaluable, and we appreciate your efforts in helping maintain a safe environment for all users.
+Вашият принос за сигурността на проекта е безценен и ние оценяваме усилията ви да помогнете за поддържането на безопасна среда за всички потребители.
