@@ -15,7 +15,7 @@ We recommend upgrading to the latest supported version to ensure your project be
 
 If you discover a security vulnerability in our project, please follow these steps:
 
-1. **Submit a Vulnerability Report**: Send your report to our designated security email at [security@project.com](mailto:security@project.com).
+1. **Submit a Vulnerability Report**: Send your report to our designated security email at [safehome_help@outlook.com](mailto:safehome_help@outlook.com).
    
 2. **What to Include in the Report**:
    - A clear description of the vulnerability.
