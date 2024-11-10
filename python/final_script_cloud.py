@@ -7,7 +7,7 @@ import time
 import re
 
 # Firebase configuration
-cred = credentials.Certificate("model_data/firebase/safehome-c4576-firebase-adminsdk-2rli7-6d7d62f21f.json")  # Ensure the correct path
+cred = credentials.Certificate("/home/kviolinov/safehome-c4576-firebase-adminsdk-2rli7-6d7d62f21f.json")  # Ensure the correct path
 firebase_admin.initialize_app(cred, {
     'storageBucket': 'safehome-c4576.appspot.com',
     'databaseURL': 'https://safehome-c4576-default-rtdb.firebaseio.com'  # Add your database URL here
