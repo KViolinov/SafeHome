@@ -71,10 +71,16 @@ def print_detection_results(file_name, results):
         print(f"Error printing detection results: {e}")
         return None
 
-def delete_image(blob_name):
-    blob = bucket.blob(blob_name)
-    blob.delete()
+def move_image_to_checked(blob_name):
+    try:
+        # Specify the new path in the 'checkedPhotos' folder
+        new_blob_name = f"checkedPhotos/{blob_name.split('/')[-1]}"
+        blob = bucket.blob(blob_name)
+        bucket.rename_blob(blob, new_blob_name)
 
+        print(f"Moved image to 'checkedPhotos': {new_blob_name}")
+    except Exception as e:
+        print(f"Error moving image to 'checkedPhotos': {e}")
 
 def send_to_firebase(file_name, detected_object):
     try:
@@ -87,7 +93,6 @@ def send_to_firebase(file_name, detected_object):
         print(f"Sent to Firebase: {sanitized_file_name} - {detected_object}")
     except Exception as e:
         print(f"Error sending data to Firebase: {e}")
-
 
 def main():
     # Ensure the target directory exists
@@ -108,8 +113,8 @@ def main():
                     if detected_object:
                         send_to_firebase(image_file_name, detected_object)
                     os.remove(local_image_path)
-                    delete_image(image_file_name)
-                    print("Processed and cleaned up the image.")
+                    move_image_to_checked(image_file_name)
+                    print("Processed and moved the image to 'checkedPhotos'.")
                 else:
                     print("Error: YOLO detection failed.")
             else:
