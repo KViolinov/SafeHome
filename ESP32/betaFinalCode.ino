@@ -1,14 +1,13 @@
-/* not tested final code with FreeRTOS-AP-UDP-Live video stream */
-
 #include "esp_camera.h"
 #include <WiFi.h>
 #include <WebServer.h>
 #include <EEPROM.h>
 #include <WiFiUdp.h>
-#include <FirebaseESP32.h> // Firebase library
-#include <DHT.h>
+#include <HTTPClient.h>
 
-// Camera and sensor pin configuration
+#define MOTION_SENSOR_PIN 13
+
+// Pin definitions for AI-Thinker model
 #define PWDN_GPIO_NUM    -1
 #define RESET_GPIO_NUM   -1
 #define XCLK_GPIO_NUM    21
@@ -26,26 +25,19 @@
 #define HREF_GPIO_NUM    23
 #define PCLK_GPIO_NUM    22
 
-#define DHT_PIN 13
-#define FIRE_SENSOR_PIN 14
-#define MQ135_PIN 15
-#define PIR_PIN 16
-
-const char* apSSID = "ESP32-Access-Point";
-const char* apPassword = "123456789";
-const int EEPROM_SIZE = 64;
-WebServer server(80);
-WiFiUDP udp;
+const char* apSSID = "ESP32-Access-Point";  // Access Point SSID
+const char* apPassword = "123456789";       // Access Point Password
+const int EEPROM_SIZE = 64;  // Size for storing SSID and Password in EEPROM
+WebServer server(80);  // Create a web server on port 80
+WiFiUDP udp; // UDP object
 bool wifiConnected = false;
-bool discovered = false;
-TaskHandle_t sensorTaskHandle;
-TaskHandle_t pirTaskHandle;
+bool discovered = false; // Flag to check if the device is discovered
 
-// Firebase setup
-#define FIREBASE_HOST "YOUR_FIREBASE_HOST"
-#define FIREBASE_AUTH "YOUR_FIREBASE_AUTH_TOKEN"
-FirebaseData fbData;
+// Firebase API variables
+const char* firebaseAuth = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjhkOWJlZmQzZWZmY2JiYzgyYzgzYWQwYzk3MmM4ZWE5NzhmNmYxMzciLCJ0eXAiOiJKV1QifQ...";
+const char* storageBucket = "safehome-c4576.appspot.com"; // Firebase Storage bucket
 
+// Function to initialize the camera
 esp_err_t init_camera() {
     camera_config_t config;
     config.ledc_channel = LEDC_CHANNEL_0;
@@ -81,7 +73,6 @@ esp_err_t init_camera() {
     return ESP_OK;
 }
 
-
 void setup() {
     Serial.begin(115200);
     EEPROM.begin(EEPROM_SIZE);
@@ -89,131 +80,123 @@ void setup() {
     // Load Wi-Fi credentials from EEPROM and attempt to connect
     String storedSSID = loadSSIDFromEEPROM();
     String storedPassword = loadPasswordFromEEPROM();
+
     if (storedSSID.length() > 0 && storedPassword.length() > 0) {
+        Serial.println("Attempting to connect with stored credentials...");
         WiFi.begin(storedSSID.c_str(), storedPassword.c_str());
-        wifiConnected = attemptWiFiConnection(10000);
+        wifiConnected = attemptWiFiConnection(10000);  // 10-second timeout
     }
 
     if (wifiConnected) {
-        printWiFiDetails();
+        printWiFiDetails(); // Print Wi-Fi details when connected
     } else {
+        // Start Access Point if connection fails
         startAccessPoint();
     }
 
+    // Initialize the camera
     init_camera();
+
+    // Serve web page for Wi-Fi configuration
     server.on("/", handleRoot);
     server.on("/video", handleVideoStream);
     server.on("/submit", HTTP_POST, handleSubmit);
     server.begin();
+    Serial.println("HTTP server started.");
+
+    // Start UDP
     udp.begin(5005);
-    
-    // Firebase and tasks setup
-    Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
-    xTaskCreatePinnedToCore(checkSensors, "SensorTask", 4096, NULL, 1, &sensorTaskHandle, 1);
-    xTaskCreatePinnedToCore(checkPIRSensor, "PIRTask", 4096, NULL, 1, &pirTaskHandle, 1);
 }
 
 void loop() {
-    server.handleClient();
+  // Handle web server requests
+  server.handleClient();
 
-    if (discovered && wifiConnected) {
-        handleVideoStream();
+  // Capture photo if motion is detected
+  if (digitalRead(MOTION_SENSOR_PIN) == HIGH) {
+    Serial.println("Motion detected!");
+
+    // Temporarily stop the video stream (by breaking the video stream loop)
+    // Capture the image
+    camera_fb_t * fb = esp_camera_fb_get();
+    if (!fb) {
+      Serial.println("Camera capture failed");
+      return;
     }
 
+    // Upload image to Firebase
+    sendImageToFirebase(fb->buf, fb->len);
+    esp_camera_fb_return(fb);  // Return frame buffer to be reused
+
+    delay(10000);  // Wait for 10 seconds before checking for motion again
+  }
+
+  // If motion isn't detected, continue the video stream
+  if (digitalRead(MOTION_SENSOR_PIN) == LOW) {
+    // Send UDP message if not discovered and Wi-Fi is connected
     if (!discovered && wifiConnected) {
-        String message = "ESP32_PACKAGE " + WiFi.macAddress();
-        udp.beginPacket("255.255.255.255", 5005);
-        udp.print(message);
-        udp.endPacket();
-        Serial.println("Sent UDP message: " + message);
+      String macAddress = WiFi.macAddress();
+      String message = "ESP32_PACKAGE " + macAddress;
 
-        int packetSize = udp.parsePacket();
-        if (packetSize) {
-            char incomingPacket[255];
-            int len = udp.read(incomingPacket, 255);
-            if (len > 0) incomingPacket[len] = '\0';
+      udp.beginPacket("255.255.255.255", 5005);
+      udp.print(message);
+      udp.endPacket();
 
-            if (String(incomingPacket) == "DISCOVERED") {
-                Serial.println("Device discovered by the server. Stopping broadcast.");
-                discovered = true;
-            }
+      Serial.println("Sent UDP message: " + message);
+
+      int packetSize = udp.parsePacket();
+      if (packetSize) {
+        char incomingPacket[255];
+        int len = udp.read(incomingPacket, 255);
+        if (len > 0) {
+          incomingPacket[len] = '\0';
         }
-        delay(5000);
+        Serial.printf("Received UDP response: %s\n", incomingPacket);
+
+        if (String(incomingPacket) == "DISCOVERED") {
+          Serial.println("Device discovered by the server. Stopping broadcast.");
+          discovered = true;  // Set flag to stop sending further packages
+        }
+      }
+      delay(5000);  // Wait before sending the next package
     }
-}
 
-void checkSensors(void *parameter) {
-    const int DHT_THRESHOLD = 50;
-    const int FIRE_THRESHOLD = HIGH;  // Set to HIGH if you want alert only on HIGH reading
-    const int MQ135_THRESHOLD = 50;
+    // Video stream continues as long as no motion is detected
+    if (!server.client().connected()) {
+        return;
+    }
 
-    String lastStatus = ""; // Store last status to prevent duplicate Firebase writes
+    camera_fb_t * fb = NULL;
+    char part_buf[64];
+    
+    // Set content length unknown for streaming video
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "multipart/x-mixed-replace; boundary=frame");
 
     while (true) {
-        // Read sensor values
-        int dhtValue = analogRead(DHT_PIN);
-        int fireValue = digitalRead(FIRE_SENSOR_PIN);
-        int mq135Value = analogRead(MQ135_PIN);
-
-        // Determine the alert status based on sensor values
-        String status;
-        if (dhtValue > DHT_THRESHOLD) {
-            status = "Alert! DHT Sensor is above normal.";
-        } else if (fireValue == FIRE_THRESHOLD) {
-            status = "Alert! Fire Sensor is above normal.";
-        } else if (mq135Value > MQ135_THRESHOLD) {
-            status = "Alert! Air quality sensor is above normal.";
-        } else {
-            status = "All sensors within normal range.";
+        fb = esp_camera_fb_get();
+        if (!fb) {
+            Serial.println("Camera capture failed");
+            break;
         }
 
-        // Only update Firebase if the status has changed
-        if (status != lastStatus) {
-            bool success = Firebase.setString(fbData, "/sensors/status", status);
-            if (success) {
-                Serial.println("Firebase update successful: " + status);
-                lastStatus = status; // Update last status to prevent duplicates
-            } else {
-                Serial.println("Failed to update Firebase.");
-            }
+        snprintf(part_buf, 64, "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n", fb->len);
+        server.sendContent(part_buf);
+        server.sendContent((const char*)fb->buf, fb->len);
+        server.sendContent("\r\n");
+
+        esp_camera_fb_return(fb);
+
+        // Exit the stream loop if the client disconnects
+        if (!server.client().connected()) {
+            break;
         }
 
-        vTaskDelay(10000 / portTICK_PERIOD_MS);  // Delay for 10 seconds
+        delay(33);  // Adjust delay for ~30fps (1000ms / 30fps ≈ 33ms)
     }
+  }
 }
 
-
-void checkPIRSensor(void *parameter) {
-    while (true) {
-        if (digitalRead(PIR_PIN) == HIGH) {
-            camera_fb_t * fb = esp_camera_fb_get();
-            if (fb) {
-                sendImageToFirebase(fb->buf, fb->len);
-                esp_camera_fb_return(fb);
-            }
-            delay(10000);
-        }
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
-}
-
-/* Firebase Image Upload */
-void sendImageToFirebase(uint8_t * imageData, size_t len) {
-    HTTPClient http;
-    String url = "https://firebasestorage.googleapis.com/v0/b/YOUR_PROJECT_ID/o/image_" + String(millis()) + ".jpg?uploadType=media";
-    http.begin(url.c_str());
-    http.addHeader("Authorization", "Bearer YOUR_FIREBASE_AUTH_TOKEN");
-    http.addHeader("Content-Type", "image/jpeg");
-
-    int httpResponseCode = http.POST(imageData, len);
-    if (httpResponseCode > 0) {
-        String response = http.getString();
-        Serial.println("Image uploaded, response: " + response);
-    } else {
-        Serial.println("Error uploading image, HTTP response: " + String(httpResponseCode));
-    }
-    http.end();
-}
 
 void handleRoot() {
     String html = "<html><body><h1>ESP32 WiFi Configuration</h1>";
@@ -254,6 +237,7 @@ void handleVideoStream() {
     }
 }
 
+// Function to handle form submission
 void handleSubmit() {
     String ssid = server.arg("ssid");
     String password = server.arg("password");
@@ -280,7 +264,56 @@ void handleSubmit() {
     ESP.restart();  // Restart the ESP32 to try connecting again with new credentials
 }
 
-// Function to save SSID and Password to EEPROM
+void sendImageToFirebase(uint8_t * imageData, size_t len) {
+  HTTPClient http;
+
+  // Get the MAC address of the device
+  String macAddress = WiFi.macAddress();
+
+  // Get the current date and time
+  String currentTime = getCurrentTime();  // Function to get date_month_hour_minute_second
+
+  // Construct the filename with the MAC address and current time
+  String filename = macAddress + "_" + currentTime + ".jpg";
+
+  // Firebase Storage URL for uploading the image
+  String url = "https://firebasestorage.googleapis.com/v0/b/" + String(storageBucket) + "/o/" + filename + "?uploadType=media";
+
+  // Initialize HTTP request
+  http.begin(url.c_str());
+  http.addHeader("Authorization", "Bearer " + String(firebaseAuth));  // Use Bearer token for authentication
+  http.addHeader("Content-Type", "image/jpeg");
+
+  // Send the POST request with the image data
+  int httpResponseCode = http.POST(imageData, len);
+  
+  if (httpResponseCode > 0) {
+    String response = http.getString();
+    Serial.println("Image uploaded, response: " + response);
+  } else {
+    Serial.println("Error uploading image, HTTP response: " + String(httpResponseCode));
+  }
+
+  http.end();
+}
+
+// Function to get current time formatted as date_month_hour_minute_second
+String getCurrentTime() {
+  time_t now;
+  struct tm timeinfo;
+  char timeStr[20];  // Buffer for time string
+
+  // Get current time
+  time(&now);
+  localtime_r(&now, &timeinfo);
+
+  // Format time as "DD_MM_HH_MM_SS"
+  strftime(timeStr, sizeof(timeStr), "%d_%m_%H_%M_%S", &timeinfo);
+  
+  return String(timeStr);
+}
+
+
 void saveCredentialsToEEPROM(const String& ssid, const String& password) {
     for (int i = 0; i < EEPROM_SIZE; i++) {
         EEPROM.write(i, 0); // Clear EEPROM
@@ -316,17 +349,13 @@ String loadPasswordFromEEPROM() {
     }
     return String(password);
 }
-
-// Function to print Wi-Fi details
 void printWiFiDetails() {
-    Serial.println("\nConnected to Wi-Fi!");
-    Serial.print("Connected to WiFi. SSID: ");
-    Serial.println(WiFi.SSID());
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP());
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+  Serial.print("MAC Address: ");
+  Serial.println(WiFi.macAddress());
 }
 
-// Function to attempt Wi-Fi connection with a timeout
 bool attemptWiFiConnection(unsigned long timeout) {
     unsigned long startAttemptTime = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < timeout) {
@@ -342,7 +371,6 @@ bool attemptWiFiConnection(unsigned long timeout) {
   }
 }
 
-// Function to start Access Point mode
 void startAccessPoint() {
     WiFi.softAP(apSSID, apPassword);
     Serial.println("Access Point started. Connect to: " + String(apSSID));
