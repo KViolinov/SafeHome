@@ -7,7 +7,6 @@
 
 #define MOTION_SENSOR_PIN 13
 
-// Pin definitions for AI-Thinker model
 #define PWDN_GPIO_NUM    -1
 #define RESET_GPIO_NUM   -1
 #define XCLK_GPIO_NUM    21
@@ -27,15 +26,18 @@
 
 const char* apSSID = "ESP32-Access-Point";  // Access Point SSID
 const char* apPassword = "123456789";       // Access Point Password
-const int EEPROM_SIZE = 64;  // Size for storing SSID and Password in EEPROM
-WebServer server(80);  // Create a web server on port 80
-WiFiUDP udp; // UDP object
+const int EEPROM_SIZE = 64;
+WebServer server(80);                       // Create a web server on port 80
+WiFiUDP udp;                                // UDP object
 bool wifiConnected = false;
-bool discovered = false; // Flag to check if the device is discovered
+bool discovered = false; 
+
+const long gmtOffset_sec = 7200;
+const int daylightOffset_sec = 3600; 
 
 // Firebase API variables
 const char* firebaseAuth = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjhkOWJlZmQzZWZmY2JiYzgyYzgzYWQwYzk3MmM4ZWE5NzhmNmYxMzciLCJ0eXAiOiJKV1QifQ...";
-const char* storageBucket = "safehome-c4576.appspot.com"; // Firebase Storage bucket
+const char* storageBucket = "safehome-c4576.appspot.com";
 
 // Function to initialize the camera
 esp_err_t init_camera() {
@@ -58,11 +60,11 @@ esp_err_t init_camera() {
     config.pin_sscb_scl = SIOC_GPIO_NUM;
     config.pin_pwdn = PWDN_GPIO_NUM;
     config.pin_reset = RESET_GPIO_NUM;
-    config.xclk_freq_hz = 20000000;  // 20MHz for better performance
+    config.xclk_freq_hz = 20000000;         // 20MHz for better performance
     config.pixel_format = PIXFORMAT_JPEG;
-    config.frame_size = FRAMESIZE_VGA;  // 640x480 resolution
-    config.jpeg_quality = 12;  // Medium quality for better balance
-    config.fb_count = 2;  // Frame buffers
+    config.frame_size = FRAMESIZE_VGA;      // 640x480 resolution
+    config.jpeg_quality = 12;               // Medium quality for better balance
+    config.fb_count = 2;                    // Frame buffers
 
     esp_err_t err = esp_camera_init(&config);
     if (err != ESP_OK) {
@@ -77,6 +79,8 @@ void setup() {
     Serial.begin(115200);
     EEPROM.begin(EEPROM_SIZE);
     
+    configTime(gmtOffset_sec, daylightOffset_sec, "pool.ntp.org", "time.nist.gov");
+
     // Load Wi-Fi credentials from EEPROM and attempt to connect
     String storedSSID = loadSSIDFromEEPROM();
     String storedPassword = loadPasswordFromEEPROM();
@@ -88,7 +92,8 @@ void setup() {
     }
 
     if (wifiConnected) {
-        printWiFiDetails(); // Print Wi-Fi details when connected
+        // Print Wi-Fi details when connected
+        printWiFiDetails(); 
     } else {
         // Start Access Point if connection fails
         startAccessPoint();
@@ -197,7 +202,6 @@ void loop() {
   }
 }
 
-
 void handleRoot() {
     String html = "<html><body><h1>ESP32 WiFi Configuration</h1>";
     html += "<form action=\"/submit\" method=\"POST\">";
@@ -237,7 +241,6 @@ void handleVideoStream() {
     }
 }
 
-// Function to handle form submission
 void handleSubmit() {
     String ssid = server.arg("ssid");
     String password = server.arg("password");
@@ -297,22 +300,22 @@ void sendImageToFirebase(uint8_t * imageData, size_t len) {
   http.end();
 }
 
-// Function to get current time formatted as date_month_hour_minute_second
 String getCurrentTime() {
-  time_t now;
-  struct tm timeinfo;
-  char timeStr[20];  // Buffer for time string
+    time_t now;
+    struct tm timeinfo;
+    char timeStr[20];  // Buffer for time string
 
-  // Get current time
-  time(&now);
-  localtime_r(&now, &timeinfo);
+    // Fetch current local time
+    if (!getLocalTime(&timeinfo)) {
+        Serial.println("Failed to obtain time");
+        return "00_00_00_00_00_00";  // Fallback if time is not available
+    }
 
-  // Format time as "DD_MM_HH_MM_SS"
-  strftime(timeStr, sizeof(timeStr), "%d_%m_%H_%M_%S", &timeinfo);
-  
-  return String(timeStr);
+    // Format time as "DD_MM_HH_MM_SS"
+    strftime(timeStr, sizeof(timeStr), "%d_%m_%H_%M_%S", &timeinfo);
+
+    return String(timeStr);
 }
-
 
 void saveCredentialsToEEPROM(const String& ssid, const String& password) {
     for (int i = 0; i < EEPROM_SIZE; i++) {
@@ -332,7 +335,6 @@ void saveCredentialsToEEPROM(const String& ssid, const String& password) {
     EEPROM.commit();
 }
 
-// Function to load SSID from EEPROM
 String loadSSIDFromEEPROM() {
     char ssid[32];
     for (int i = 0; i < 32; i++) {
@@ -341,7 +343,6 @@ String loadSSIDFromEEPROM() {
     return String(ssid);
 }
 
-// Function to load Password from EEPROM
 String loadPasswordFromEEPROM() {
     char password[32];
     for (int i = 0; i < 32; i++) {
@@ -349,6 +350,7 @@ String loadPasswordFromEEPROM() {
     }
     return String(password);
 }
+
 void printWiFiDetails() {
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
