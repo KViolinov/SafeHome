@@ -1,3 +1,5 @@
+//working verison 13.11.2024 
+
 <?php
 session_start();
 
@@ -25,7 +27,6 @@ function firebaseRequest($url, $method = 'GET', $data = null) {
 
     return json_decode($response, true);
 }
-
 // Remove device link if "remove" action is requested
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['remove_mac'])) {
     $macToRemove = $_POST['remove_mac'];
