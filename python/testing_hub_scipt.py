@@ -58,6 +58,9 @@ def listen_for_esp32_packages(port=5005):
                     # Send device links to Firebase API
                     send_device_links_to_firebase()
 
+                    # Update the GUI to show the new device link
+                    update_gui()
+
 # Function to start ngrok and get the public URL
 def start_ngrok(esp32_ip, esp32_port=80):
     ngrok_command = f"ngrok http {esp32_ip}:{esp32_port}"
