@@ -14,7 +14,7 @@ SafeHome е интелигентна система за наблюдение, �
 
 - **SafeHome Camera Kit**
 - **SafeHome Hub** за съхранение на данни и изображения
-- [SafeHome Hub Desktop App](SafeHome/python/SafeHome%20Hub%20Desktop%20App.exe)
+- [SafeHome Hub Desktop App](SafeHome/python/SafeHome_Hub_Desktop_App.exe)
 
 ## Приложение и сайт
 
