@@ -5,22 +5,24 @@ session_start();
 define('FIREBASE_USER_DEVICES_URL', 'https://safehome-c4576-default-rtdb.firebaseio.com/userDevices.json');
 define('FIREBASE_DEVICE_LINKS_URL', 'https://safehome-c4576-default-rtdb.firebaseio.com/device_links.json');
 define('FIREBASE_MESSAGES_URL', 'https://safehome-c4576-default-rtdb.firebaseio.com/messages.json');
+define('FIREBASE_RESULTS_URL', 'https://safehome-c4576-default-rtdb.firebaseio.com/results.json');
+define('FIREBASE_CAMERA_INFO_URL', 'https://safehome-c4576-default-rtdb.firebaseio.com/camera_info.json');
 
 // Function to handle Firebase requests
 function firebaseRequest($url, $method = 'GET', $data = null) {
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    
+
     if ($method == 'POST' || $method == 'PUT' || $method == 'DELETE') {
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
         curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
     }
-    
+
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
 
     $response = curl_exec($ch);
     curl_close($ch);
-    
+
     return json_decode($response, true);
 }
 
@@ -33,10 +35,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['remove_mac'])) {
     exit();
 }
 
-// Fetch all user devices, device links, and messages from Firebase
+// Fetch all user devices, device links, camera info, and messages from Firebase
 $userDevices = firebaseRequest(FIREBASE_USER_DEVICES_URL);
 $deviceLinks = firebaseRequest(FIREBASE_DEVICE_LINKS_URL);
+$cameraInfo = firebaseRequest(FIREBASE_CAMERA_INFO_URL);
 $messages = firebaseRequest(FIREBASE_MESSAGES_URL);
+$results = firebaseRequest(FIREBASE_RESULTS_URL);
 
 // Get the logged-in username
 $username = isset($_SESSION['username']) ? $_SESSION['username'] : null;
@@ -84,6 +88,15 @@ $username = isset($_SESSION['username']) ? $_SESSION['username'] : null;
             padding: 10px;
             border-radius: 5px;
         }
+
+        .messages {
+            flex: 1;
+            max-width: 35%;
+            padding: 15px;
+            border: 1px solid #ddd;
+            max-height: 400px; /* Limit the box height */
+            overflow-y: auto; /* Enable scrolling if content exceeds max height */
+        }
     </style>
 </head>
 <body>
@@ -106,12 +119,12 @@ $username = isset($_SESSION['username']) ? $_SESSION['username'] : null;
                 <?php endif; ?>
             </header>
 
-            <h1>Device List</h1>
+            <h1 style="text-align: center;">Device List</h1>
 
             <?php if ($userDevices && $deviceLinks): ?>
                 <table>
                     <tr>
-                        <th>MAC Address</th>
+                        <th>Camera Nickname</th>
                         <th>Video Stream</th>
                         <th>Action</th>
                     </tr>
@@ -119,10 +132,18 @@ $username = isset($_SESSION['username']) ? $_SESSION['username'] : null;
                         <?php if (isset($device['username']) && $device['username'] === $username): ?>
                             <?php 
                                 $macAddress = $device['macAddress'];
+                                // Look for the device in camera_info to get the nickname
+                                $nickname = null;
+                                foreach ($cameraInfo as $camera) {
+                                    if ($camera['macAddress'] === $macAddress) {
+                                        $nickname = $camera['nickname'];
+                                        break;
+                                    }
+                                }
                                 $link = isset($deviceLinks[$macAddress]) ? $deviceLinks[$macAddress] : null;
                             ?>
                             <tr>
-                                <td><?php echo htmlspecialchars($macAddress); ?></td>
+                                <td><?php echo htmlspecialchars($nickname ? $nickname : 'No nickname'); ?></td>
                                 <td>
                                     <?php if ($link): ?>
                                         <iframe src="<?php echo htmlspecialchars($link); ?>" 
@@ -148,20 +169,77 @@ $username = isset($_SESSION['username']) ? $_SESSION['username'] : null;
             <?php endif; ?>
         </div>
 
-        <!-- Last Messages Section -->
-        <div class="messages">
-            <h2>Last Messages</h2>
-            <?php if ($messages): ?>
-                <ul>
-                    <?php foreach ($messages as $message): ?>
-                        <li><?php echo htmlspecialchars($message); ?></li>
-                    <?php endforeach; ?>
-                </ul>
-            <?php else: ?>
-                <p>No messages found.</p>
+<!-- Last Messages Section -->
+<div class="messages">
+    <h2>Last Messages</h2>
+    <?php if ($results): ?>
+        <ul>
+            <?php
+            // Array to store user's MAC addresses
+            $userMacAddresses = array_column(array_filter($userDevices, function ($device) use ($username) {
+                return isset($device['username']) && $device['username'] === $username;
+            }), 'macAddress');
+
+            // Counter to limit the messages to the last 5 for the user
+            $messageCount = 0;
+
+            // Loop through results and filter by user's MAC addresses
+            foreach ($results as $key => $record):
+                // Extract MAC address and timestamp from the key
+                $keyParts = explode('_', $key);
+                $macAddress = $keyParts[0];
+
+                // Check if the message is from a device associated with the user
+                if (in_array($macAddress, $userMacAddresses)) {
+                    if (count($keyParts) >= 6) {
+                        $day = $keyParts[1];
+                        $month = $keyParts[2];
+                        $year = $keyParts[3];
+                        $hour = $keyParts[4];
+                        $minute = $keyParts[5];
+
+                        // Updated timestamp format: hour:minute at day month year
+                        $readableTimestamp = "$hour:$minute at $day $month $year";
+                    } else {
+                        $readableTimestamp = "Invalid Timestamp Format";
+                    }
+
+                    // Look up the nickname from the camera info
+                    $nickname = null;
+                    foreach ($cameraInfo as $camera) {
+                        if ($camera['macAddress'] === $macAddress) {
+                            $nickname = $camera['nickname'];
+                            break;
+                        }
+                    }
+
+                    // If no nickname, use the MAC address
+                    $displayName = $nickname ? $nickname : $macAddress;
+
+                    // Display the message with the updated format
+                    echo "<li>Camera in <strong>" . htmlspecialchars($displayName) . "</strong> detected a <strong>" . htmlspecialchars($record) . "</strong> at <strong>" . htmlspecialchars($readableTimestamp) . "</strong></li>";
+
+                    // Increment message count
+                    $messageCount++;
+                    
+                    // Break loop after displaying last 5 messages
+                    if ($messageCount >= 5) break;
+                }
+            endforeach;
+            ?>
+
+            <!-- Display a message if there are no messages for user's devices -->
+            <?php if ($messageCount === 0): ?>
+                <li>No messages available for your devices.</li>
             <?php endif; ?>
-        </div>
-    </div>
+        </ul>
+    <?php else: ?>
+        <p>No data available in /results</p>
+    <?php endif; ?>
+</div>
+
+
+
 
     <script>
         function bypassNgrokWarning(iframe) {
