@@ -1,260 +1,161 @@
-//working verison 13.11.2024 
-
 <?php
 session_start();
-
-// Firebase configuration URLs
-define('FIREBASE_USER_DEVICES_URL', 'https://safehome-c4576-default-rtdb.firebaseio.com/userDevices.json');
-define('FIREBASE_DEVICE_LINKS_URL', 'https://safehome-c4576-default-rtdb.firebaseio.com/device_links.json');
-define('FIREBASE_MESSAGES_URL', 'https://safehome-c4576-default-rtdb.firebaseio.com/messages.json');
-define('FIREBASE_RESULTS_URL', 'https://safehome-c4576-default-rtdb.firebaseio.com/results.json');
-define('FIREBASE_CAMERA_INFO_URL', 'https://safehome-c4576-default-rtdb.firebaseio.com/camera_info.json');
-
-// Function to handle Firebase requests
-function firebaseRequest($url, $method = 'GET', $data = null) {
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-    if ($method == 'POST' || $method == 'PUT' || $method == 'DELETE') {
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-    }
-
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-
-    $response = curl_exec($ch);
-    curl_close($ch);
-
-    return json_decode($response, true);
-}
-// Remove device link if "remove" action is requested
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['remove_mac'])) {
-    $macToRemove = $_POST['remove_mac'];
-    $firebaseDeleteUrl = FIREBASE_DEVICE_LINKS_URL . '/' . urlencode($macToRemove) . '.json';
-    firebaseRequest($firebaseDeleteUrl, 'DELETE');
-    header('Location: ' . $_SERVER['PHP_SELF']);
-    exit();
-}
-
-// Fetch all user devices, device links, camera info, and messages from Firebase
-$userDevices = firebaseRequest(FIREBASE_USER_DEVICES_URL);
-$deviceLinks = firebaseRequest(FIREBASE_DEVICE_LINKS_URL);
-$cameraInfo = firebaseRequest(FIREBASE_CAMERA_INFO_URL);
-$messages = firebaseRequest(FIREBASE_MESSAGES_URL);
-$results = firebaseRequest(FIREBASE_RESULTS_URL);
-
-// Get the logged-in username
 $username = isset($_SESSION['username']) ? $_SESSION['username'] : null;
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SafeHome - Dashboard</title>
+    <title>SafeHome - Home</title>
     <link rel="stylesheet" href="style.css">
     <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f4f8;
+            color: #333;
+            text-align: center; /* Centering all the text */
+        }
+
+        header {
+            background-color: #34495e;
+            padding: 20px;
+            color: #fff;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+        }
+
+        header nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0 0;
+        }
+
+        header nav ul li {
+            display: inline;
+            margin-right: 30px;
+        }
+
+        header nav ul li a {
+            color: #fff;
+            text-decoration: none;
+            font-size: 1.1rem;
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+
+        header nav ul li a:hover {
+            color: #f39c12;
+        }
+
         .container {
             display: flex;
-            justify-content: space-between;
-            gap: 20px;
-            padding: 20px;
+            justify-content: center; /* Center the container */
+            gap: 30px;
+            padding: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        /* Highlight the active link */
+        nav ul li a.active {
+            background-color: #2980b9; /* Change the background color to highlight */
+            color: white; /* Make text white for better contrast */
+            font-weight: bold; /* Optional: Make the active link bold */
         }
 
-        .device-list {
-            flex: 1;
-            max-width: 60%;
+        h2 {
+            font-size: 1.8rem;
+            color: #2c3e50;
         }
 
-        .messages {
-            flex: 1;
-            max-width: 35%;
-            padding: 15px;
-            border: 1px solid #ddd;
+        .project-info {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            width: 60%; /* Adjusting the width for better centering */
+            margin: 0 auto;
+            transition: transform 0.3s ease;
         }
 
-        .messages h2 {
+        .project-info:hover {
+            transform: translateY(-5px);
+        }
+
+        .project-info h3 {
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+
+        .project-info ul {
+            padding-left: 20px;
+            font-size: 1.1rem;
+        }
+
+        .project-info ul li {
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+
+        .project-info p {
+            font-size: 1.1rem;
+            line-height: 1.8;
+        }
+
+        .user-info {
             text-align: center;
-        }
-
-        .messages ul {
-            list-style-type: none;
-            padding: 0;
-        }
-
-        .messages ul li {
-            background: #f4f4f4;
-            margin: 5px 0;
-            padding: 10px;
-            border-radius: 5px;
-        }
-
-        .messages {
-            flex: 1;
-            max-width: 35%;
-            padding: 15px;
-            border: 1px solid #ddd;
-            max-height: 400px; /* Limit the box height */
-            overflow-y: auto; /* Enable scrolling if content exceeds max height */
+            margin-top: 15px;
         }
     </style>
 </head>
+
 <body>
-    <div class="container">
-        <!-- Device List Section -->
-        <div class="device-list">
-            <header>
-                <h1>Dashboard</h1>
-                <nav>
-                    <ul>
-                        <li><a href="index.php">Dashboard</a></li>
-                        <li><a href="configure.php">Configure Camera</a></li>
-                        <li><a href="profile.php">Profile</a></li>
-                    </ul>
-                </nav>
-                <?php if ($username): ?>
-                    <div class="user-info">
-                        <p>Logged in as: <?php echo htmlspecialchars($username); ?></p>
-                    </div>
-                <?php endif; ?>
-            </header>
 
-            <h1 style="text-align: center;">Device List</h1>
+    <header>
+        <h1>Welcome to SafeHome</h1>
+        <nav>
+            <ul>
+                <li><a href="index.php" class="active">Home</a></li>
+                <li><a href="dashboard.php">Dashboard</a></li>
+                <li><a href="configure.php">Configure Camera</a></li>
+                <li><a href="profile.php">Profile</a></li>
+            </ul>
+        </nav>
 
-            <?php if ($userDevices && $deviceLinks): ?>
-                <table>
-                    <tr>
-                        <th>Camera Nickname</th>
-                        <th>Video Stream</th>
-                        <th>Action</th>
-                    </tr>
-                    <?php foreach ($userDevices as $device): ?>
-                        <?php if (isset($device['username']) && $device['username'] === $username): ?>
-                            <?php 
-                                $macAddress = $device['macAddress'];
-                                // Look for the device in camera_info to get the nickname
-                                $nickname = null;
-                                foreach ($cameraInfo as $camera) {
-                                    if ($camera['macAddress'] === $macAddress) {
-                                        $nickname = $camera['nickname'];
-                                        break;
-                                    }
-                                }
-                                $link = isset($deviceLinks[$macAddress]) ? $deviceLinks[$macAddress] : null;
-                            ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars($nickname ? $nickname : 'No nickname'); ?></td>
-                                <td>
-                                    <?php if ($link): ?>
-                                        <iframe src="<?php echo htmlspecialchars($link); ?>" 
-                                                style="width: 400px; height: 300px; border: none;" 
-                                                allow="autoplay" 
-                                                onload="bypassNgrokWarning(this)"></iframe>
-                                    <?php else: ?>
-                                        Link not found
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <form method="POST" action="">
-                                        <input type="hidden" name="remove_mac" value="<?php echo htmlspecialchars($macAddress); ?>">
-                                        <button type="submit" class="remove-button">Remove from Dashboard</button>
-                                    </form>
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    <?php endforeach; ?>
-                </table>
-            <?php else: ?>
-                <p>No devices found.</p>
-            <?php endif; ?>
-        </div>
-
-<!-- Last Messages Section -->
-<div class="messages">
-    <h2>Last Messages</h2>
-    <?php if ($results): ?>
-        <ul>
-            <?php
-            // Array to store user's MAC addresses
-            $userMacAddresses = array_column(array_filter($userDevices, function ($device) use ($username) {
-                return isset($device['username']) && $device['username'] === $username;
-            }), 'macAddress');
-
-            // Counter to limit the messages to the last 5 for the user
-            $messageCount = 0;
-
-            // Loop through results and filter by user's MAC addresses
-            foreach ($results as $key => $record):
-                // Extract MAC address and timestamp from the key
-                $keyParts = explode('_', $key);
-                $macAddress = $keyParts[0];
-
-                // Check if the message is from a device associated with the user
-                if (in_array($macAddress, $userMacAddresses)) {
-                    if (count($keyParts) >= 6) {
-                        $day = $keyParts[1];
-                        $month = $keyParts[2];
-                        $year = $keyParts[3];
-                        $hour = $keyParts[4];
-                        $minute = $keyParts[5];
-
-                        // Updated timestamp format: hour:minute at day month year
-                        $readableTimestamp = "$hour:$minute at $day $month $year";
-                    } else {
-                        $readableTimestamp = "Invalid Timestamp Format";
-                    }
-
-                    // Look up the nickname from the camera info
-                    $nickname = null;
-                    foreach ($cameraInfo as $camera) {
-                        if ($camera['macAddress'] === $macAddress) {
-                            $nickname = $camera['nickname'];
-                            break;
-                        }
-                    }
-
-                    // If no nickname, use the MAC address
-                    $displayName = $nickname ? $nickname : $macAddress;
-
-                    // Display the message with the updated format
-                    echo "<li>Camera in <strong>" . htmlspecialchars($displayName) . "</strong> detected a <strong>" . htmlspecialchars($record) . "</strong> at <strong>" . htmlspecialchars($readableTimestamp) . "</strong></li>";
-
-                    // Increment message count
-                    $messageCount++;
-                    
-                    // Break loop after displaying last 5 messages
-                    if ($messageCount >= 5) break;
-                }
-            endforeach;
-            ?>
-
-            <!-- Display a message if there are no messages for user's devices -->
-            <?php if ($messageCount === 0): ?>
-                <li>No messages available for your devices.</li>
-            <?php endif; ?>
-        </ul>
-    <?php else: ?>
-        <p>No data available in /results</p>
-    <?php endif; ?>
+        <?php if ($username): ?>
+<div class="user-info">
+    <p>Logged in as: <?php echo htmlspecialchars($username); ?></p>
 </div>
+<?php endif; ?>
 
+    </header>
 
+    <div class="project-info">
+        <h2>Проект: SafeHome</h2>
+        <h3>4.1 Цели</h3>
+        <p>
+            Основната цел на проекта е да създаде цялостна платформа за управление и мониторинг на домашната сигурност, използвайки Machine Learning и AI за анализ на данни и открития на аномалии. Платформата ще използва SafeHome Camera Kit – комплект от камера и сензори, базиран на ESP32, за да следи за движение, нива на температура, въздух и пожарна безопасност.
+        </p>
 
+        <h3>4.5 Реализация</h3>
+        <ul>
+            <li>Камера и сензори – ESP32 с камера модул и допълнителни сензори за температура, качество на въздуха и движение.</li>
+            <li>Софтуерни компоненти – Python скриптове и PHP скриптове за обработка на данни и машинно обучение.</li>
+            <li>Потребителски интерфейси – уеб и мобилни приложения за визуализация на резултати и управление на устройството.</li>
+        </ul>
 
-    <script>
-        function bypassNgrokWarning(iframe) {
-            iframe.contentWindow.addEventListener("load", function() {
-                try {
-                    const visitButton = iframe.contentWindow.document.querySelector("a[href*='ngrok.com']");
-                    if (visitButton) {
-                        visitButton.click();
-                    }
-                } catch (e) {
-                    console.error("Could not access the iframe content:", e);
-                }
-            });
-        }
-    </script>
+        <h3>4.3 Ниво на сложност</h3>
+        <p>
+            Проектът изисква знания по програмиране на микроконтролери (C++ за ESP32), уеб програмиране (HTML, CSS, JavaScript), машинно обучение и IoT интеграция.
+        </p>
+    </div>
+
 </body>
 </html>
