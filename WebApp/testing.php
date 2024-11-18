@@ -341,13 +341,10 @@ $username = isset($_SESSION['username']) ? $_SESSION['username'] : null;
     </div>
     <?php endif; ?>
 </header>
-
     <div class="container">
-
         <!-- Device List Section -->
         <div class="device-list">
             <h2>Device List</h2>
-
             <?php if ($userDevices && $deviceLinks): ?>
                 <table>
                     <tr>
@@ -355,10 +352,8 @@ $username = isset($_SESSION['username']) ? $_SESSION['username'] : null;
                         <th>Video Stream</th>
                         <th>Action</th>
                     </tr>
-
                     <?php foreach ($userDevices as $device): ?>
                         <?php if (isset($device['username']) && $device['username'] === $username): ?>
-
                             <?php
                                 $macAddress = $device['macAddress'];
                                 $nickname = null;
@@ -369,10 +364,8 @@ $username = isset($_SESSION['username']) ? $_SESSION['username'] : null;
                                         break;
                                     }
                                 }
-
                                 $link = isset($deviceLinks[$macAddress]) ? $deviceLinks[$macAddress] : null;
                             ?>
-
                             <tr>
                                 <td><?php echo htmlspecialchars($nickname ? $nickname : 'No nickname'); ?></td>
                                 <td>
@@ -404,130 +397,140 @@ $username = isset($_SESSION['username']) ? $_SESSION['username'] : null;
                 <p>No devices found.</p>
             <?php endif; ?>
         </div>
-<div class="messages">
-    <h2>Last Messages</h2>
-
-    <?php if ($results): ?>
-    <ul>
-        <?php
-        // Get all the user devices' MAC addresses
-        $userMacAddresses = array_column(array_filter($userDevices, function ($device) use ($username) {
-            return isset($device['username']) && $device['username'] === $username;
-        }), 'macAddress');
-
-        $messagesWithTimestamp = [];
-
-        // Loop through each result and prepare the messages with their timestamps
-        foreach ($results as $key => $message) {
-            // Extract the MAC address from the key
-            $keyParts = explode('_', $key);
-            $macAddress = $keyParts[0];
-
-            // Check if the MAC address is in the user's devices list
-            if (in_array($macAddress, $userMacAddresses)) {
-                // Check if we have the correct timestamp format (day, month, hour, minute, second)
-                if (count($keyParts) >= 6) {
-                    $day = $keyParts[1];
-                    $month = $keyParts[2];
-                    $hour = $keyParts[3];
-                    $minute = $keyParts[4];
-                    $second = $keyParts[5]; // Extract second field
-
-                    // Create a timestamp from the current year (using a fixed year or dynamic year can be used)
-                    $currentYear = date("Y"); // Get the current year
-                    $timestamp = mktime($hour, $minute, $second, $month, $day, $currentYear); // Include the current year
-                    $readableTimestamp = "$hour:$minute:$second at $day/$month"; // Human-readable format without the year
-                } else {
-                    $timestamp = 0; // If timestamp format is invalid, assign 0
-                    $readableTimestamp = "Invalid Timestamp Format";
-                }
-
-                // Get the camera's nickname
-                $nickname = null;
-                foreach ($cameraInfo as $camera) {
-                    if ($camera['macAddress'] === $macAddress) {
-                        $nickname = $camera['nickname'];
-                        break;
-                    }
-                }
-
-                $displayName = $nickname ? $nickname : $macAddress;
-
-                // Add the message and timestamp to the array
-                $messagesWithTimestamp[] = [
-                    'message' => $message,
-                    'nickname' => $displayName,
-                    'timestamp' => $timestamp,
-                    'readableTimestamp' => $readableTimestamp,
-                    'macAddress' => $macAddress, // Store macAddress for later use
-                    'timestampStr' => "$day-$month-$hour-$minute-$second" // Store timestamp as string for file matching
-                ];
-            }
-        }
-
-        // Sort messages by timestamp (latest first)
-        usort($messagesWithTimestamp, function($a, $b) {
-            return $b['timestamp'] - $a['timestamp']; // Descending order of timestamp
-        });
-
-        // Output the sorted messages (latest first)
-        $messageCount = 0;
-        foreach ($messagesWithTimestamp as $messageData):
-            echo "<li>Camera in <strong>" . htmlspecialchars($messageData['nickname']) . "</strong> detected: ";
-            echo htmlspecialchars($messageData['message']) . " (Time: " . $messageData['readableTimestamp'] . ")</li>";
-
+    <div class="messages">
+        <h2>Last Messages</h2>
+        <?php if ($results): ?>
+        <ul>
+            <?php
+            // Get all the user devices' MAC addresses
+            $userMacAddresses = array_column(array_filter($userDevices, function ($device) use ($username) {
+                return isset($device['username']) && $device['username'] === $username;
+            }), 'macAddress');
+    
+            $messagesWithTimestamp = [];
+            $lastPhotos = []; // Initialize an array to store the last photos
+    
             // Firebase Storage bucket name
             $bucketName = "safehome-c4576.appspot.com";
             $folder = "checkedPhotos";
-
+    
             // API URL to list items in the folder
             $url = "https://firebasestorage.googleapis.com/v0/b/$bucketName/o?prefix=$folder/";
-
-            // Initialize cURL session
+    
+            // Initialize cURL session to fetch photos from Firebase Storage
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
+    
             // Execute cURL request
             $response = curl_exec($ch);
-
+    
             // Check for cURL errors
-            if(curl_errno($ch)) {
+            if (curl_errno($ch)) {
                 echo "cURL Error: " . curl_error($ch);
             } else {
                 $data = json_decode($response, true);
-
+    
                 // Check if items exist
                 if (isset($data['items'])) {
                     // Limit to the last 5 items
                     $items = array_slice($data['items'], -5);
-
+    
                     foreach ($items as $item) {
                         // Generate the download URL for each item
                         $fileName = $item['name'];
                         $imageUrl = "https://firebasestorage.googleapis.com/v0/b/$bucketName/o/" . urlencode($fileName) . "?alt=media";
-
-                        // Display the image
-                        echo "<img src='$imageUrl' alt='Image from Firebase Storage'>";
+                        // Store the image URL in the list
+                        $lastPhotos[] = $imageUrl;
                     }
-                } else {
-                    echo "<p>No images found in '$folder' folder.</p>";
                 }
             }
-
             // Close cURL session
             curl_close($ch);
+    
+            // Loop through each result and prepare the messages with their timestamps
+            foreach ($results as $key => $message) {
+                // Extract the MAC address from the key
+                $keyParts = explode('_', $key);
+                $macAddress = $keyParts[0];
+    
+                // Check if the MAC address is in the user's devices list
+                if (in_array($macAddress, $userMacAddresses)) {
+                    // Check if we have the correct timestamp format (day, month, hour, minute, second)
+                    if (count($keyParts) >= 6) {
+                        $day = $keyParts[1];
+                        $month = $keyParts[2];
+                        $hour = $keyParts[3];
+                        $minute = $keyParts[4];
+                        $second = $keyParts[5]; // Extract second field
+    
+                        // Create a timestamp from the current year (using a fixed year or dynamic year can be used)
+                        $currentYear = date("Y"); // Get the current year
+                        $timestamp = mktime($hour, $minute, $second, $month, $day, $currentYear); // Include the current year
+                        $readableTimestamp = "$hour:$minute:$second at $day/$month"; // Human-readable format without the year
+                    } else {
+                        $timestamp = 0; // If timestamp format is invalid, assign 0
+                        $readableTimestamp = "Invalid Timestamp Format";
+                    }
+    
+                    // Get the camera's nickname
+                    $nickname = null;
+                    foreach ($cameraInfo as $camera) {
+                        if ($camera['macAddress'] === $macAddress) {
+                            $nickname = $camera['nickname'];
+                            break;
+                        }
+                    }
+    
+                    $displayName = $nickname ? $nickname : $macAddress;
+    
+                    // Add the message and timestamp to the array
+                    $messagesWithTimestamp[] = [
+                        'message' => $message,
+                        'nickname' => $displayName,
+                        'timestamp' => $timestamp,
+                        'readableTimestamp' => $readableTimestamp
+                    ];
+                }
+            }
+    
+            // Sort messages by timestamp (latest first)
+            usort($messagesWithTimestamp, function ($a, $b) {
+                return $b['timestamp'] - $a['timestamp']; // Descending order of timestamp
+            });
+    
+            // Initialize image index counter
+            $imageIndex = 0;
+    
+            // Output the sorted messages (latest first)
+            foreach ($messagesWithTimestamp as $messageData): ?>
+                <li>
+                    Camera in <strong><?= htmlspecialchars($messageData['nickname']); ?></strong> detected:
+                    <?= htmlspecialchars($messageData['message']); ?>
+                    (Time: <?= htmlspecialchars($messageData['readableTimestamp']); ?>)
+                </li>
+                <?php
+                // Display one image per message if available
+                if (isset($lastPhotos[$imageIndex])): ?>
+                    <img src="<?= $lastPhotos[$imageIndex]; ?>" alt="Image from Firebase Storage"
+                    style="width: 50%; height: auto; object-fit: contain; margin-left: 10px;">
 
-            $messageCount++;
-            if ($messageCount >= 5) break; // Show only the last 5 messages
-        endforeach;
-        ?>
-    </ul>
-    <?php else: ?>
-        <p>No messages available.</p>
-    <?php endif; ?>
-</div> <!-- End of .messages div -->
-
+                    <?php
+                    // Increment the image index
+                    $imageIndex++;
+                endif;
+    
+                // If we've shown all images, reset the index to loop through them again
+                if ($imageIndex >= count($lastPhotos)) {
+                    $imageIndex = 0;
+                }
+            endforeach;
+            ?>
+        </ul>
+        <?php else: ?>
+            <p>No messages available.</p>
+        <?php endif; ?>
+    </div> <!-- End of .messages div -->
 <!-- Make sure to close the rest of the HTML tags -->
 </body>
 </html>
