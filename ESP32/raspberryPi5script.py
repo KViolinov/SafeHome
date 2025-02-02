@@ -39,25 +39,62 @@
 
 
 
-import RPi.GPIO as GPIO
+# import RPi.GPIO as GPIO
+# import time
+
+# PIR_PIN = 16  # GPIO pin connected to the PIR sensor output
+
+# GPIO.setmode(GPIO.BCM)  # Use Broadcom pin numbering
+# GPIO.setup(PIR_PIN, GPIO.IN)  # Set PIR pin as input
+
+# print("PIR Sensor is ready...")
+
+# try:
+#     while True:
+#         if GPIO.input(PIR_PIN):  # Motion detected
+#             print("Motion detected!")
+#             time.sleep(1)  # Wait to avoid multiple detections
+#         else:
+#             print("No motion")
+#         time.sleep(0.5)
+
+# except KeyboardInterrupt:
+#     print("Exiting...")
+#     GPIO.cleanup()  # Reset GPIO pins
+
+
+
 import time
+import board
+import busio
+from PIL import Image, ImageDraw, ImageFont
+import adafruit_ssd1306
 
-PIR_PIN = 16  # GPIO pin connected to the PIR sensor output
+# Initialize I2C
+i2c = busio.I2C(board.SCL, board.SDA)
 
-GPIO.setmode(GPIO.BCM)  # Use Broadcom pin numbering
-GPIO.setup(PIR_PIN, GPIO.IN)  # Set PIR pin as input
+# Initialize OLED display (128x64 resolution)
+oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)
 
-print("PIR Sensor is ready...")
+# Clear the display
+oled.fill(0)
+oled.show()
 
-try:
-    while True:
-        if GPIO.input(PIR_PIN):  # Motion detected
-            print("Motion detected!")
-            time.sleep(1)  # Wait to avoid multiple detections
-        else:
-            print("No motion")
-        time.sleep(0.5)
+# Create a blank image with black background
+image = Image.new("1", (oled.width, oled.height))
+draw = ImageDraw.Draw(image)
 
-except KeyboardInterrupt:
-    print("Exiting...")
-    GPIO.cleanup()  # Reset GPIO pins
+# Load a font (or use the default one)
+font = ImageFont.load_default()
+
+# Display text
+draw.text((10, 25), "Hello, Pi 5!", font=font, fill=255)
+
+# Display image on OLED
+oled.image(image)
+oled.show()
+
+time.sleep(5)  # Show for 5 seconds
+oled.fill(0)  # Clear screen
+oled.show()
+
