@@ -39,28 +39,6 @@
 
 
 
-import RPi.GPIO as GPIO
-import time
-
-PIR_PIN = 20  # GPIO pin connected to the PIR sensor output
-
-GPIO.setmode(GPIO.BCM)  # Use Broadcom pin numbering
-GPIO.setup(PIR_PIN, GPIO.IN)  # Set PIR pin as input
-
-print("PIR Sensor is ready...")
-
-try:
-    while True:
-        if GPIO.input(PIR_PIN):  # Motion detected
-            print("Motion detected!")
-            time.sleep(1)  # Wait to avoid multiple detections
-        else:
-            print("No motion")
-        time.sleep(0.5)
-
-except KeyboardInterrupt:
-    print("Exiting...")
-    GPIO.cleanup()  # Reset GPIO pins
 
 
 import cv2
