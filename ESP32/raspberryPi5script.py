@@ -72,14 +72,15 @@ app = Flask(__name__)
 # Start Ngrok tunnel on port 5000
 try:
     public_url = ngrok.connect(5000).public_url
-    print(f"Ngrok tunnel created: {public_url}")
+    public_url_with_path = public_url + "/video_feed"  # Append "/video_feed"
+    print(f"Ngrok tunnel created: {public_url_with_path}")
 except Exception as e:
     print(f"Error starting Ngrok: {e}")
-    public_url = "ngrok-error"
+    public_url_with_path = "ngrok-error"
 
 # Store MAC and Ngrok link in dictionary
-if public_url != "ngrok-error":
-    device_links[device_mac] = public_url
+if public_url_with_path != "ngrok-error":
+    device_links[device_mac] = public_url_with_path
 
 # Send device links to Firebase
 def send_device_links_to_firebase():
@@ -110,7 +111,7 @@ def send_device_links_to_firebase():
     except Exception as e:
         print(f"Error sending to Firebase: {e}")
 
-# Send device link to Firebase
+# Send the link to Firebase
 send_device_links_to_firebase()
 
 # Open USB webcam (wait for availability)
