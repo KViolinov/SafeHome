@@ -44,18 +44,16 @@
 import cv2
 from flask import Flask, Response
 from pyngrok import ngrok
-import firebase_admin
-from firebase_admin import credentials, storage, db
+import requests
 import subprocess
 import time
+import atexit
 
-# Initialize Firebase
-cred = credentials.Certificate("safehome_sdk.json")
-firebase_admin.initialize_app(cred, {
-    'storageBucket': 'gs://safehome-c4576.appspot.com',
-    'databaseURL': 'https://safehome-c4576-default-rtdb.firebaseio.com/'
-})
-ref = db.reference("/device_links")
+# Firebase Database URL
+FIREBASE_URL = "https://safehome-c4576-default-rtdb.firebaseio.com/device_links.json"
+
+# Dictionary to store device links
+device_links = {}
 
 # Get device MAC address
 def get_mac_address():
@@ -79,10 +77,41 @@ except Exception as e:
     print(f"Error starting Ngrok: {e}")
     public_url = "ngrok-error"
 
-# Save Ngrok link to Firebase
+# Store MAC and Ngrok link in dictionary
 if public_url != "ngrok-error":
-    ref.update({device_mac: public_url})
-    print(f"Ngrok link saved to Firebase: {device_mac} -> {public_url}")
+    device_links[device_mac] = public_url
+
+# Send device links to Firebase
+def send_device_links_to_firebase():
+    global device_links
+
+    try:
+        print("Checking existing device links in Firebase...")
+
+        # Fetch existing links from Firebase
+        response = requests.get(FIREBASE_URL)
+        existing_data = response.json() if response.status_code == 200 else {}
+
+        if not existing_data:
+            print("No existing data found. Adding new links to Firebase.")
+
+        # Update existing entries or add new ones
+        for mac, url in device_links.items():
+            if existing_data and mac in existing_data:
+                print(f"Updating link for MAC: {mac} in Firebase.")
+            else:
+                print(f"Adding new link for MAC: {mac} in Firebase.")
+
+            # Update Firebase with the new or updated link
+            requests.patch(FIREBASE_URL, json={mac: url})
+
+        print("Device links successfully sent to Firebase.")
+
+    except Exception as e:
+        print(f"Error sending to Firebase: {e}")
+
+# Send device link to Firebase
+send_device_links_to_firebase()
 
 # Open USB webcam (wait for availability)
 camera = cv2.VideoCapture(0)
@@ -115,7 +144,6 @@ def index():
     return f"Webcam Stream is running. <br> Access video at: <a href='{public_url}/video_feed'>{public_url}/video_feed</a>"
 
 # Gracefully close camera on exit
-import atexit
 @atexit.register
 def cleanup():
     if camera.isOpened():
@@ -124,6 +152,7 @@ def cleanup():
 
 if __name__ == "__main__":
     app.run(port=5000)
+
 
 
 
