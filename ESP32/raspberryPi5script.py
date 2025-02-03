@@ -3,6 +3,8 @@ from flask import Flask, Response
 from pyngrok import ngrok
 import requests
 import subprocess
+from gpiozero import MotionSensor
+from signal import pause
 import time
 import atexit
 
@@ -12,6 +14,8 @@ FIREBASE_URL = "https://safehome-c4576-default-rtdb.firebaseio.com/device_links.
 # Dictionary to store device links
 device_links = {}
 
+pir = MotionSensor(20)
+
 # Get device MAC address
 def get_mac_address():
     try:
@@ -20,6 +24,7 @@ def get_mac_address():
     except Exception as e:
         print(f"Error retrieving MAC address: {e}")
         return "unknown-mac"
+
 
 device_mac = get_mac_address()
 
@@ -37,6 +42,7 @@ except Exception as e:
 # Store MAC and Ngrok link in dictionary
 if public_url != "ngrok-error":
     device_links[device_mac] = public_url
+
 
 # Send device links to Firebase
 def send_device_links_to_firebase():
@@ -67,6 +73,7 @@ def send_device_links_to_firebase():
     except Exception as e:
         print(f"Error sending to Firebase: {e}")
 
+
 # Send device link to Firebase
 send_device_links_to_firebase()
 
@@ -77,8 +84,30 @@ time.sleep(2)  # Give some time for the camera to initialize
 if not camera.isOpened():
     print("Error: Could not access the webcam.")
 
+
 def generate_frames():
     while True:
+        if pir.when_motion:
+            print("Motion Detected")
+            # Open the webcam (0 is usually the default camera)
+            cap = cv2.VideoCapture(0)
+
+            if not cap.isOpened():
+                print("Error: Could not access the webcam")
+                return
+
+            # Capture a single frame
+            ret, frame = cap.read()
+
+            if ret:
+                # Save the captured image with a timestamp
+                filename = f"motion_{int(time.time())}.jpg"
+                cv2.imwrite(filename, frame)
+                print(f"Picture taken and saved as {filename}")
+
+                # Release the webcam
+                cap.release()
+
         success, frame = camera.read()
         if not success:
             print("Error: Failed to read frame from camera.")
@@ -91,14 +120,17 @@ def generate_frames():
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
+
 @app.route('/video_feed')
 def video_feed():
     return Response(generate_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
+
 @app.route('/')
 def index():
     return f"Webcam Stream is running. <br> Access video at: <a href='{public_url}/video_feed'>{public_url}/video_feed</a>"
+
 
 # Gracefully close camera on exit
 @atexit.register
@@ -107,45 +139,6 @@ def cleanup():
         camera.release()
         print("Camera released.")
 
+
 if __name__ == "__main__":
     app.run(port=5000)
-
-
-
-
-
-# from gpiozero import MotionSensor
-# from signal import pause
-# import cv2
-# import time
-
-# pir = MotionSensor(20)
-
-# def motion_function():
-#     print("Motion Detected")
-#     # Open the webcam (0 is usually the default camera)
-#     cap = cv2.VideoCapture(0)
-    
-#     if not cap.isOpened():
-#         print("Error: Could not access the webcam")
-#         return
-    
-#     # Capture a single frame
-#     ret, frame = cap.read()
-    
-#     if ret:
-#         # Save the captured image with a timestamp
-#         filename = f"motion_{int(time.time())}.jpg"
-#         cv2.imwrite(filename, frame)
-#         print(f"Picture taken and saved as {filename}")
-    
-#     # Release the webcam
-#     cap.release()
-
-# def no_motion_function():
-#     print("Motion stopped")
-
-# pir.when_motion = motion_function
-# pir.when_no_motion = no_motion_function
-
-# pause()
