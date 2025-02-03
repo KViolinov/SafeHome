@@ -186,3 +186,7 @@ pir.when_motion = motion_function
 pir.when_no_motion = no_motion_function
 
 pause()
+
+
+
+ngrok config add-authtoken 2nqBKTvsPrG6Q2wNJz9XiVNK3hq_4jKQkFVPpU5x1NzMwHj8x
