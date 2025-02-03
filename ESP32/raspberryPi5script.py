@@ -1,46 +1,3 @@
-# import cv2
-# from flask import Flask, Response
-# from pyngrok import ngrok
-
-# # Initialize Flask app
-# app = Flask(__name__)
-
-# # Start Ngrok tunnel on port 5000
-# public_url = ngrok.connect(5000).public_url
-# print(f"Ngrok tunnel: {public_url}")
-# print(f"Access the video stream at: {public_url}/video_feed")
-
-# # Open USB webcam
-# camera = cv2.VideoCapture(2)  # Use 1 instead of 0 if you have multiple webcams
-
-# def generate_frames():
-#     while True:
-#         success, frame = camera.read()
-#         if not success:
-#             break
-#         else:
-#             ret, buffer = cv2.imencode('.jpg', frame)
-#             frame = buffer.tobytes()
-#             yield (b'--frame\r\n'
-#                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-# @app.route('/video_feed')
-# def video_feed():
-#     return Response(generate_frames(),
-#                     mimetype='multipart/x-mixed-replace; boundary=frame')
-
-# @app.route('/')
-# def index():
-#     return f"Webcam Stream is running. <br> Access video at: <a href='{public_url}/video_feed'>{public_url}/video_feed</a>"
-
-# if __name__ == "__main__":
-#     app.run(port=5000)
-
-
-
-
-
-
 import cv2
 from flask import Flask, Response
 from pyngrok import ngrok
@@ -72,15 +29,14 @@ app = Flask(__name__)
 # Start Ngrok tunnel on port 5000
 try:
     public_url = ngrok.connect(5000).public_url
-    public_url_with_path = public_url + "/video_feed"  # Append "/video_feed"
-    print(f"Ngrok tunnel created: {public_url_with_path}")
+    print(f"Ngrok tunnel created: {public_url}")
 except Exception as e:
     print(f"Error starting Ngrok: {e}")
-    public_url_with_path = "ngrok-error"
+    public_url = "ngrok-error"
 
 # Store MAC and Ngrok link in dictionary
-if public_url_with_path != "ngrok-error":
-    device_links[device_mac] = public_url_with_path
+if public_url != "ngrok-error":
+    device_links[device_mac] = public_url
 
 # Send device links to Firebase
 def send_device_links_to_firebase():
@@ -111,7 +67,7 @@ def send_device_links_to_firebase():
     except Exception as e:
         print(f"Error sending to Firebase: {e}")
 
-# Send the link to Firebase
+# Send device link to Firebase
 send_device_links_to_firebase()
 
 # Open USB webcam (wait for availability)
@@ -158,35 +114,38 @@ if __name__ == "__main__":
 
 
 
+# from gpiozero import MotionSensor
+# from signal import pause
+# import cv2
+# import time
 
+# pir = MotionSensor(20)
 
+# def motion_function():
+#     print("Motion Detected")
+#     # Open the webcam (0 is usually the default camera)
+#     cap = cv2.VideoCapture(0)
+    
+#     if not cap.isOpened():
+#         print("Error: Could not access the webcam")
+#         return
+    
+#     # Capture a single frame
+#     ret, frame = cap.read()
+    
+#     if ret:
+#         # Save the captured image with a timestamp
+#         filename = f"motion_{int(time.time())}.jpg"
+#         cv2.imwrite(filename, frame)
+#         print(f"Picture taken and saved as {filename}")
+    
+#     # Release the webcam
+#     cap.release()
 
+# def no_motion_function():
+#     print("Motion stopped")
 
+# pir.when_motion = motion_function
+# pir.when_no_motion = no_motion_function
 
-
-
-
-
-
-
-
-
-from gpiozero import MotionSensor
-from signal import pause
-
-pir = MotionSensor(18)
-
-def motion_function():
-    print("Motion Detected")
-
-def no_motion_function():
-    print("Motion stopped")
-
-pir.when_motion = motion_function
-pir.when_no_motion = no_motion_function
-
-pause()
-
-
-
-ngrok config add-authtoken 2nqBKTvsPrG6Q2wNJz9XiVNK3hq_4jKQkFVPpU5x1NzMwHj8x
+# pause()
