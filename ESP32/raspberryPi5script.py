@@ -176,39 +176,18 @@ if __name__ == "__main__":
 
 
 
-(.venv) konstantin@raspberrypi:~/Desktop $ /home/konstantin/Desktop/.venv/bin/python /home/konstantin/Desktop/test.py
-/home/konstantin/Desktop/.venv/lib/python3.11/site-packages/gpiozero/devices.py:300: PinFactoryFallback: Falling back from lgpio: No module named 'lgpio'
-  warnings.warn(
-Traceback (most recent call last):
-  File "/home/konstantin/Desktop/.venv/lib/python3.11/site-packages/gpiozero/pins/pi.py", line 411, in pin
-    pin = self.pins[info]
-          ~~~~~~~~~^^^^^^
-KeyError: PinInfo(number=36, name='GPIO16', names=frozenset({16, 'GPIO16', 'J8:36', '16', 'BOARD36', 'WPI27', 'BCM16'}), pull='', row=18, col=2, interfaces=frozenset({'', 'uart', 'spi', 'dpi', 'gpio'}))
+from gpiozero import MotionSensor
+from signal import pause
 
-During handling of the above exception, another exception occurred:
+pir = MotionSensor(18)
 
-Traceback (most recent call last):
-  File "/home/konstantin/Desktop/test.py", line 31, in <module>
-    motion_sensor = MotionSensor(PIR_PIN)
-                    ^^^^^^^^^^^^^^^^^^^^^
-  File "/home/konstantin/Desktop/.venv/lib/python3.11/site-packages/gpiozero/devices.py", line 108, in __call__
-    self = super().__call__(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/konstantin/Desktop/.venv/lib/python3.11/site-packages/gpiozero/input_devices.py", line 588, in __init__
-    super().__init__(
-  File "/home/konstantin/Desktop/.venv/lib/python3.11/site-packages/gpiozero/input_devices.py", line 257, in __init__
-    super().__init__(
-  File "/home/konstantin/Desktop/.venv/lib/python3.11/site-packages/gpiozero/mixins.py", line 243, in __init__
-    super().__init__(*args, **kwargs)
-  File "/home/konstantin/Desktop/.venv/lib/python3.11/site-packages/gpiozero/input_devices.py", line 79, in __init__
-    super().__init__(pin, pin_factory=pin_factory)
-  File "/home/konstantin/Desktop/.venv/lib/python3.11/site-packages/gpiozero/devices.py", line 553, in __init__
-    pin = self.pin_factory.pin(pin)
-          ^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/konstantin/Desktop/.venv/lib/python3.11/site-packages/gpiozero/pins/pi.py", line 413, in pin
-    pin = self.pin_class(self, info)
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/konstantin/Desktop/.venv/lib/python3.11/site-packages/gpiozero/pins/rpigpio.py", line 101, in __init__
-    GPIO.setup(self._number, GPIO.IN, self.GPIO_PULL_UPS[self._pull])
-RuntimeError: Cannot determine SOC peripheral base address
-(.venv) konstantin@raspberrypi:~/Desktop $ 
+def motion_function():
+    print("Motion Detected")
+
+def no_motion_function():
+    print("Motion stopped")
+
+pir.when_motion = motion_function
+pir.when_no_motion = no_motion_function
+
+pause()
