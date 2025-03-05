@@ -40,7 +40,7 @@ device_links = {}
 def get_mac_address():
     try:
         mac = subprocess.check_output("cat /sys/class/net/wlan0/address", shell=True).decode().strip()
-        return mac.replace(":", "-")
+        return mac.replace("-", ":")
     except Exception as e:
         print(f"Error retrieving MAC address: {e}")
         return "unknown-mac"
