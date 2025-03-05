@@ -30,7 +30,7 @@ except serial.SerialException as e:
 FIREBASE_URL = "https://safehome-c4576-default-rtdb.firebaseio.com/device_links.json"
 
 # Initialize Firebase Admin SDK (Update with your service account JSON file path)
-FIREBASE_CREDENTIALS = "path/to/your-service-account.json"
+FIREBASE_CREDENTIALS = "/home/konstantin/Desktop/safehome-c4576-firebase-adminsdk-2rli7-627a495f20.json"
 FIREBASE_STORAGE_BUCKET = "safehome-c4576.appspot.com"
 
 # Dictionary to store device links
