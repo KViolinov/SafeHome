@@ -115,7 +115,7 @@ def video_feed():
 def index():
     return f"Webcam Stream is running. <br> Access video at: <a href='{public_url}/video_feed'>{public_url}/video_feed</a>"
 
-# Function to capture an image
+# Function to capture an image with a new filename format
 def capture_image():
     if not firebase_admin._apps:
         cred = credentials.Certificate(FIREBASE_CREDENTIALS)
@@ -123,9 +123,9 @@ def capture_image():
 
     success, frame = camera.read()
     if success:
-        # Generate filename with MAC address and timestamp
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"{device_mac} - {timestamp}.jpg"
+        # Generate filename with MAC address and a custom timestamp format
+        timestamp = datetime.now().strftime("%d_%m_%H_%M_%S")  # Use day_month_hour_minute_second format
+        filename = f"{device_mac}_{timestamp}.jpg"  # Updated filename format
         filepath = os.path.join("/tmp", filename)  # Temporary directory to store image
 
         # Save image locally
@@ -151,6 +151,7 @@ def capture_image():
 
     else:
         print("Error capturing image.")
+
 
 # Function to listen for ESP32 messages
 def listen_to_esp():
